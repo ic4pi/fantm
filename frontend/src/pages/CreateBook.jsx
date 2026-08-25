@@ -82,7 +82,7 @@ export default function CreateBook() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-12" data-testid="create-book-page">
-      <p className="font-mono text-primary text-xs mb-2">// NEW MANUSCRIPT</p>
+      <p className="font-mono text-accent text-xs tracking-widest mb-2">// NEW MANUSCRIPT</p>
       <h1 className="font-serif text-4xl tracking-tight mb-8">Describe your book</h1>
 
       <form onSubmit={handleSubmit} className="space-y-8 font-mono text-sm">
@@ -94,7 +94,7 @@ export default function CreateBook() {
                 type="button"
                 key={t.value}
                 onClick={() => setBookType(t.value)}
-                className={`py-3 border transition-colors ${bookType === t.value ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary"}`}
+                className={`py-3 border transition-all ${bookType === t.value ? "border-primary text-primary shadow-[0_0_14px_rgba(111,242,212,0.25)]" : "border-border hover:border-primary/50"}`}
                 data-testid={`booktype-option-${t.value}`}
               >
                 {t.label}
@@ -148,7 +148,7 @@ export default function CreateBook() {
                 type="button"
                 key={l.value}
                 onClick={() => setLength(l.value)}
-                className={`py-3 border transition-colors text-center ${length === l.value ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary"}`}
+                className={`py-3 border transition-all text-center ${length === l.value ? "border-primary text-primary shadow-[0_0_14px_rgba(111,242,212,0.25)]" : "border-border hover:border-primary/50"}`}
                 data-testid={`length-option-${l.value}`}
               >
                 <div>{l.label}</div>
@@ -167,7 +167,7 @@ export default function CreateBook() {
                 key={s.key}
                 disabled={!s.unlocked}
                 onClick={() => setStyle(s.key)}
-                className={`py-3 px-3 border transition-colors text-left ${style === s.key ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary"} ${!s.unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                className={`py-3 px-3 border transition-all text-left ${style === s.key ? "border-primary text-primary shadow-[0_0_14px_rgba(111,242,212,0.25)]" : "border-border hover:border-primary/50"} ${!s.unlocked ? "opacity-40 cursor-not-allowed" : ""}`}
                 data-testid={`style-option-${s.key}`}
               >
                 <div className="flex items-center gap-1.5">
@@ -193,7 +193,7 @@ export default function CreateBook() {
           )}
         </div>
 
-        <div className="border border-border p-4 flex items-center justify-between" data-testid="create-book-cost-estimate">
+        <div className="gilt-corners border border-border p-4 flex items-center justify-between" data-testid="create-book-cost-estimate">
           <span className="flex items-center gap-2 text-muted-foreground"><Zap className="w-4 h-4 text-primary" /> estimated cost</span>
           <span className={canAfford ? "text-primary" : "text-destructive"}>{estimatedCost.toLocaleString()} NC (balance: {balance.toLocaleString()} NC)</span>
         </div>
@@ -203,7 +203,7 @@ export default function CreateBook() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-4 bg-primary text-primary-foreground uppercase hover:bg-primary/80 transition-colors disabled:opacity-50"
+          className="w-full py-4 bg-primary text-primary-foreground uppercase tracking-wide hover:shadow-[0_0_18px_rgba(111,242,212,0.35)] transition-shadow disabled:opacity-50"
           data-testid="create-book-submit-button"
         >
           {loading ? "spinning up the engine..." : "generate book"}

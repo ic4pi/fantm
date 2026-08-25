@@ -25,11 +25,11 @@ export default function BookGeneration() {
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-12" data-testid="book-generation-page">
-      <p className="font-mono text-primary text-xs mb-2">// LIVE GENERATION</p>
+      <p className="font-mono text-accent text-xs tracking-widest mb-2">// THE SITTING</p>
       <h1 className="font-serif text-4xl tracking-tight mb-2" data-testid="generation-book-title">{book.title}</h1>
-      <p className="font-mono text-xs text-muted-foreground mb-8">{book.book_type} · {book.length} · {book.genre || "no genre"}</p>
+      <p className="font-mono text-xs text-muted-foreground mb-8 tracking-wide">{book.book_type} · {book.length} · {book.genre || "no genre"}</p>
 
-      <div className="border border-primary bg-card p-6 font-mono text-sm shadow-[0_0_20px_rgba(57,255,20,0.08)]" data-testid="generation-terminal">
+      <div className="gilt-corners border border-primary/40 bg-card p-6 font-mono text-sm shadow-[0_0_24px_rgba(111,242,212,0.10)]" data-testid="generation-terminal">
         {book.status === "pending" && (
           <p className="text-primary">[architecting outline...] <span className="blink-cursor">█</span></p>
         )}
@@ -45,7 +45,7 @@ export default function BookGeneration() {
           return (
             <p
               key={idx}
-              className={isDone ? "text-primary/70" : isActive ? "text-primary" : "text-muted-foreground"}
+              className={isDone ? "text-primary/70" : isActive ? "text-secondary" : "text-muted-foreground"}
               data-testid={`generation-chapter-row-${idx}`}
             >
               [{chapterNum}/{book.total_chapters}] {ch.title}
@@ -71,7 +71,7 @@ export default function BookGeneration() {
       {book.status === "completed" && (
         <button
           onClick={() => navigate(`/books/${id}/read`)}
-          className="mt-8 px-8 py-4 bg-primary text-primary-foreground uppercase font-mono text-sm hover:bg-primary/80 transition-colors"
+          className="mt-8 px-8 py-4 bg-primary text-primary-foreground uppercase font-mono text-sm tracking-wide hover:shadow-[0_0_20px_rgba(111,242,212,0.35)] transition-shadow"
           data-testid="generation-read-button"
         >
           Read Book →

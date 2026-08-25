@@ -87,7 +87,7 @@ export default function BookReader() {
   return (
     <div className="flex flex-col lg:flex-row max-w-6xl mx-auto px-6 py-12 gap-10" data-testid="book-reader-page">
       <aside className="lg:w-64 shrink-0">
-        <p className="font-mono text-primary text-xs mb-3">// CONTENTS</p>
+        <p className="font-mono text-accent text-xs tracking-widest mb-3">// CONTENTS</p>
         {book.cover_image_url ? (
           <img
             src={book.cover_image_url}
@@ -106,13 +106,13 @@ export default function BookReader() {
             <Lock className="w-4 h-4" /> {unlocking ? "unlocking..." : `unlock — ${ILLUSTRATION_UNLOCK_COST.toLocaleString()} NC`}
           </button>
         ) : null}
-        <h2 className="font-serif text-2xl mb-4">{book.title}</h2>
+        <h2 className="font-serif italic text-2xl mb-4">{book.title}</h2>
         <div className="flex flex-col gap-1 font-mono text-sm mb-6" data-testid="reader-chapter-list">
           {chapters.map((c, idx) => (
             <button
               key={c.id}
               onClick={() => { setActiveIdx(idx); setEditing(false); }}
-              className={`text-left px-3 py-2 border-l-2 transition-colors ${idx === activeIdx ? "border-primary text-primary bg-secondary" : "border-border text-muted-foreground hover:text-foreground"}`}
+              className={`text-left px-3 py-2 border-l-2 transition-colors ${idx === activeIdx ? "border-primary text-primary bg-card" : "border-border text-muted-foreground hover:text-foreground hover:border-accent/50"}`}
               data-testid={`reader-chapter-nav-${idx}`}
             >
               {idx + 1}. {c.title}
@@ -122,7 +122,7 @@ export default function BookReader() {
         <button
           onClick={handleExport}
           disabled={exporting}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-border hover:border-primary transition-colors font-mono text-xs uppercase disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-border hover:border-primary/60 transition-colors font-mono text-xs uppercase tracking-wide disabled:opacity-50"
           data-testid="reader-export-pdf-button"
         >
           <FileDown className="w-4 h-4" />
@@ -134,7 +134,7 @@ export default function BookReader() {
 
       <main className="flex-1 max-w-2xl">
         <div className="flex items-center justify-between mb-6">
-          <p className="font-mono text-xs text-muted-foreground">Chapter {activeIdx + 1} of {chapters.length}</p>
+          <p className="font-mono text-xs text-muted-foreground tracking-wide">Chapter {activeIdx + 1} of {chapters.length}</p>
           {!editing ? (
             <button
               onClick={() => setEditing(true)}
@@ -162,7 +162,7 @@ export default function BookReader() {
             src={active.image_url}
             alt={active.title}
             loading="lazy"
-            className="mb-8 w-full aspect-[16/9] object-cover border border-border"
+            className="gilt-corners mb-8 w-full aspect-[16/9] object-cover border border-border"
             data-testid="reader-illustration-image"
           />
         ) : active?.has_image && !book.illustrations_unlocked ? (
@@ -185,11 +185,11 @@ export default function BookReader() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={20}
-            className="w-full bg-transparent border border-primary outline-none px-4 py-3 font-serif text-lg leading-relaxed resize-none"
+            className="w-full bg-transparent border border-primary/60 outline-none px-4 py-3 font-serif text-lg leading-relaxed resize-none"
             data-testid="reader-edit-textarea"
           />
         ) : (
-          <div className="font-serif text-lg leading-relaxed whitespace-pre-wrap text-foreground/90" data-testid="reader-chapter-content">
+          <div className="reader-dropcap font-serif text-lg leading-relaxed whitespace-pre-wrap text-foreground/90" data-testid="reader-chapter-content">
             {active?.content}
           </div>
         )}

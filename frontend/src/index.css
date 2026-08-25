@@ -198,6 +198,18 @@ code {
 .gilt-corners::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
 .gilt-corners::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
 
+/* the reader's opening drop cap — targets a single dedicated class, not
+   :first-of-type (which resolves against ALL sibling <p>/divs, including
+   unrelated eyebrow text above it — learned that the hard way once already) */
+.reader-dropcap::first-letter {
+    font-family: "Bodoni Moda", serif;
+    font-size: 3.4em;
+    float: left;
+    line-height: 0.82;
+    padding: 0.05em 0.1em 0 0;
+    color: hsl(var(--primary));
+}
+
 ::selection {
     background: #6FF2D4;
     color: #07070B;

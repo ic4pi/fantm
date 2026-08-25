@@ -1,0 +1,72 @@
+{
+  "typography": {
+    "primary": "Space Mono",
+    "secondary": "Cormorant Garamond",
+    "rules": [
+      "Retain Space Mono for all UI components, dashboard metrics, terminal logs, and system feedback. Ensure wide tracking (`tracking-wider`) for uppercase labels.",
+      "Retain Cormorant Garamond for generated narrative content, book reader interfaces, and elegant large display headings.",
+      "Never center-align UI text. Maintain a brutalist, asymmetrical left-alignment indicative of terminal legacy."
+    ]
+  },
+  "colors": {
+    "base": "#050505",
+    "primary": "#E6FF00",
+    "accent": "#FF007F",
+    "text_primary": "#FFFFFF",
+    "text_muted": "#888888",
+    "surface": "rgba(10, 10, 10, 0.8)",
+    "gradients": {
+      "neon_fusion": "linear-gradient(135deg, #E6FF00 0%, #FF007F 100%)",
+      "chrome_sheen": "linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.0) 100%)",
+      "noir_shadow": "linear-gradient(to top, #050505 0%, transparent 100%)"
+    },
+    "rules": [
+      "Replace all legacy #39FF14 (Green) with Neon Yellow (#E6FF00).",
+      "Replace all legacy #8A0303 (Blood Red) with Neon Hot Pink (#FF007F).",
+      "Use gradients purposefully on borders, active button states, and hover effects—keep gradient coverage under 20% of the screen."
+    ]
+  },
+  "visual_enhancers": {
+    "ray_gun_punk_noir": "Stark contrast between absolute black voids and blinding neon structures. UI elements must feel machined from dark, reflective chrome and powered by volatile energy.",
+    "borders": "0px border radius globally. Use sharp, jagged corners where possible. Structural borders should be `1px solid rgba(230, 255, 0, 0.2)`, illuminating fully on hover.",
+    "glows": "Utilize layered box-shadows for the 'ray gun' energy bloom: `box-shadow: 0 0 10px rgba(230,255,0,0.5), 0 0 20px rgba(255,0,127,0.3)`. Use stark inner-shadows (`inset 0 1px 0 rgba(255,255,255,0.3)`) to emulate sleek chrome edges.",
+    "textures": "Keep the existing CRT scanline and noise grain overlays, but ensure their mix-blend modes (e.g., `overlay` or `soft-light`) interact correctly with the new yellow/pink hues to create a dense, cinematic fog effect."
+  },
+  "motion": {
+    "page_transitions": "CRT power-on/off flicker. Wrap routes in `<AnimatePresence>`. On Exit (Power Off): collapse scaleY to 0.01, spike brightness to 3, with a heavy #FF007F glow (duration: 0.35s). On Enter (Power On): expand scaleY from 0.01 to 1, utilizing a slow, soft ambient flicker (`opacity: [0, 1, 0.4, 1]`) in #E6FF00 (duration: 0.6s).",
+    "hero_ambient": "Particle/fog drift. Render large, highly blurred `div`s (`blur-[120px]`) in #E6FF00 and #FF007F behind a fixed noise layer. Use Framer Motion to slowly translate them across the viewport to simulate thick, glowing noir fog.",
+    "hero_glitch": "Glitch-in text reveal on mount. Utilize CSS `clip-path` polygon shifting accompanied by intense chromatic aberration text-shadows (`-3px 0 #E6FF00, 3px 0 #FF007F`). Snap to perfect alignment after 0.5s.",
+    "book_hover": "Extreme 3D tilt/parallax for dashboard covers. Implement using `react-parallax-tilt`. Settings must be exaggerated: `tiltMaxAngleX={35}`, `tiltMaxAngleY={35}`, `scale={1.1}`, `transitionSpeed={400}`, `glareEnable={true}`, `glareMaxOpacity={0.7}`, `glareColor='#E6FF00'`. The book must feel completely detached from the background.",
+    "custom_cursor": "Slick prism neon light tracker. A fixed Framer Motion element tracking `clientX/Y`. Composed of a sharp #E6FF00 center dot, surrounded by a trailing reactive geometric frame. The frame uses `box-shadow: inset 0 0 10px #E6FF00, 0 0 15px #FF007F` for a reflective chrome/prism look. Upon hovering interactive elements, the frame snaps to the target's bounding box and pulses."
+  },
+  "layouts": {
+    "spacing": "Hyper-generous. Use `p-8` to `p-12` within bento grid containers. Negative space is essential to amplify the stark noir shadows.",
+    "grids": "Asymmetric Bento Grids (`grid-cols-1 md:grid-cols-12`). Mix `col-span-8`, `col-span-4`, and empty structural columns (`col-span-2`) to create tension."
+  },
+  "accessibility": {
+    "contrast": "Ensure the high-intensity neon colors meet contrast standards against the #050505 background. Add `text-shadow: 0 2px 4px rgba(0,0,0,0.8)` if text intersects with the fog or bright glows.",
+    "reduced_motion": "Respect `prefers-reduced-motion`. Downgrade CRT flicker to a simple crossfade and disable the extreme 3D tilt for users who opt out."
+  },
+  "component_instructions": {
+    "buttons": "Brutalist, 0px border radius. Default: transparent background, `border-b-2 border-r-2 border-[#E6FF00]`. Hover: Fill with `neon_fusion` gradient, inverse text color to black, intense shadow.",
+    "navbar": "Sticky, glassmorphism `bg-[#050505]/70 backdrop-blur-xl`. Bottom border `1px solid #FF007F`. Ensure the rotating logo and 'Neural Credit' balance badge use the new primary colors and emit a soft glow.",
+    "cards": "For the reader/editor and settings panels, use stark `#111111` backgrounds with sharp 1px `#E6FF00` borders. No internal rounded corners."
+  },
+  "instructions_to_main_agent": [
+    "Do NOT rewrite existing business logic, Stripe integrations, block-generation states, or database queries. This is strictly a visual overlay and motion injection.",
+    "Update global CSS/Tailwind configs to replace the old spooky green/red with the new #E6FF00 (Neon Yellow) and #FF007F (Hot Pink).",
+    "Install and integrate `react-parallax-tilt` for the dashboard book grids.",
+    "Implement the global custom cursor using Framer Motion logic. It should be visually hidden on mobile viewports.",
+    "Build the CRT page transition wrapper utilizing Framer Motion's `<AnimatePresence>` around the main routes.",
+    "Add `data-testid` attributes to all new or structurally modified interactive elements."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Avoid generic, 'on distribution' outputs (e.g., standard rounded SaaS cards). Embrace the sharp, experimental brutalism requested.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "No AI assistant emojis.",
+    "DO NOT apply `transition: all`. Target specific properties.",
+    "DO NOT use completely transparent backgrounds for overlays or headers—always use a dark scrim or blur to maintain text legibility.",
+    "Use `sonner` for all application toasts, styled to match the ray-gun punk aesthetic.",
+    "Every interaction (buttons, inputs, links) must have a reactive micro-animation (e.g., scale, color shift, or glitch)."
+  ]
+}

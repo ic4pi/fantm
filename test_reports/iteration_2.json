@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 2: illustration reveal/lock feature (Pollinations.ai) end-to-end verified. Backend: 25/25 pytest passing (added 6 illustration tests + refactored free-tier tests to use a proper free user since tester1 was upgraded to premium). Frontend: full premium + full free-tier flows both green. Premium (tester1@fantm.ink) reader shows real cover on sidebar (data-testid=reader-cover-image) and real per-chapter illustration on each chapter (data-testid=reader-illustration-image), both hitting image.pollinations.ai/prompt/... URLs; dashboard shows real cover thumbnail (data-testid=book-cover-{id}); PDF export returns HTTP 200 application/pdf. Free tier (fresh user + 1 book) shows 'cover locked' on dashboard card (data-testid=book-cover-locked-{id}), 'cover locked' in reader sidebar (data-testid=reader-cover-locked), and 'illustration locked — upgrade to reveal' in reader body (data-testid=reader-illustration-locked). All three lock targets open the UpgradeModal when clicked. Regressions verified: free tier still cannot edit chapters (opens UpgradeModal), cannot export PDF (opens UpgradeModal), cannot create a 2nd book (opens UpgradeModal, backend still 403). No 'illustration coming soon' placeholder ever shown once has_image=True — matches spec.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/payments/checkout", "issue": "Invalid lookup_key still returns HTTP 500 with 'Price not found' (should be 400) — carried over from iteration 1, not blocking."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "books.py serialize_book/serialize_chapter correctly gate cover_image_url and image_url behind reveal_images while keeping has_cover_image/has_image booleans exposed. Clean, consistent tier gating.",
+    "generation.py URL construction is deterministic (sha256 seed per book + chapter offset) so images are stable across regenerations of the page — good for caching. STYLE_SUFFIX enforces consistent gothic aesthetic.",
+    "pdf_export.py fetches Pollinations images via requests.get inside build_book_pdf and embeds them — could add a timeout/fallback to avoid the endpoint hanging (currently blocks up to ~60s for the 5-chapter book, borderline OK).",
+    "BookReader.jsx: the 3-way branch (image_url present → real image, else has_image && !isPremium → locked button, else → 'illustration generating...' placeholder) is correct and unambiguous.",
+    "BookCard.jsx: dashboard shows locked placeholder for free tier when has_cover_image=true — spec-compliant.",
+    "Free-tier user with a completed book that has has_cover_image but null cover_image_url renders correctly, but note: the reader-cover-locked button lacks a visible tooltip/aria-label — minor a11y nit only.",
+    "generation.py's `client = Groq(api_key=os.environ[\"GROQ_API_KEY\"])` at module import time will crash server startup if the env var is unset. Safe for now (var is set), but noted."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (25/25)", "frontend": "100% (all illustration + regression flows passed)"},
+  "test_credentials": "Premium: tester1@fantm.ink / testpass123 (owns 'The Clockwork Requiem' 6a7469dd86f74d6467a1af92, 5 chapters, all illustrations generated). Pre-seeded free with 1 book (no illustrations, from iteration 1): test_xdgsjmvfgh@fantm.ink / testpass123. Fresh free users created this run (each has 1 completed book with locked illustrations): test_ill688f57a5@fantm.ink, test_ilxa9bff931@fantm.ink (both testpass123).",
+  "seed_data_creation": "Registered 2 fresh free-tier users with 1 completed short novel each (illustrations generated, cover+chapter image_url populated in Mongo but hidden from GET responses). Safe to leave — TEST_ prefix on emails.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend regression at /app/backend/tests/backend_test.py now has 25 tests (~26s parallel runtime with 2 workers). TestIllustrations covers premium reveal + free-tier lock (creates a fresh user + book and polls up to 60s for cover to appear). If tester1 ever gets downgraded to free, the illustration reveal tests will fail — re-upgrade via db.users.update_one({email:'tester1@fantm.ink'}, {$set:{tier:'premium', premium_active:True}}) or use Stripe test checkout. PREMIUM_BOOK_ID constant = 6a7469dd86f74d6467a1af92; if that doc is deleted from Mongo, illustration tests must be updated. Free-tier regression tests now use test_xdgsjmvfgh@fantm.ink (kept free, kept 1 book) — do NOT upgrade that user.",
+  "rca of the issue": "No new issues. Only carry-over: /api/payments/checkout returning 500 for unknown lookup_key. Non-blocking."
+}

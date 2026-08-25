@@ -1,0 +1,43 @@
+{
+  "summary": "First testing pass for fantm.ink AI book generation SaaS. Ran full backend regression (19/19 pytest passing) and end-to-end browser automation covering: register → dashboard → wizard → book generation (real Groq ~87s, 5 coherent chapters, 870+ words each) → reader → free-tier gating (edit + PDF both trigger UpgradeModal) → Stripe checkout ($9.99/mo premium page loaded from checkout.stripe.com) → payment/success + payment/cancel routes → login → logout. All critical flows PASS. AI (Groq llama-3.3-70b-versatile) verified end-to-end with real coherent output; Stripe verified with real test-mode checkout URL and page render. Illustrations 'coming soon' placeholder as expected (deferred scope).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/payments/checkout", "issue": "Invalid lookup_key returns HTTP 500 with detail 'Price not found: ...' — should be 400 Bad Request since it's client input. Not blocking."},
+      {"endpoint": "POST /api/auth/register", "issue": "Rate-limit lockout is keyed by ip:email and only applied on login, not on register — acceptable but consider register enumeration guard."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Landing/all pages", "issues": ["Retro-futuristic-spooky theme intact: CRT green #39FF14 on black, red accent for Upgrade CTA, 0px border radius, Space Mono + Cormorant Garamond, scanline/grain overlay present, sharp contrast. No design issues found."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(optional) Return 400 instead of 500 for unknown Stripe lookup_key in POST /api/payments/checkout.",
+    "(informational, not a bug) Illustrations feature intentionally deferred — 'illustrations coming soon' placeholder rendered in reader as spec'd; no action needed until xAI/Grok image key is added."
+  ],
+  "critical_code_review_comments": [
+    "auth.py set_auth_cookies uses secure=True and samesite='none' — correct for cross-origin preview deploy; cookies successfully round-tripped in browser during the E2E run.",
+    "books.py serialize_book and serialize_chapter correctly omit MongoDB _id and expose string id. No ObjectId leak.",
+    "books.py free-tier check compares count only for non-premium users; correct order (limit before length check).",
+    "Frontend Dashboard preemptively gates 2nd-book click by opening UpgradeModal (books.length >= 1) — good UX; backend still enforces (verified 403).",
+    "generation.py running_summary + characters + plot_threads are threaded per chapter — verified by inspecting generated Ch1..Ch5 coherence (same characters, resolved plot threads).",
+    "payments.py invalid lookup_key returns 500 (should be 400). Also, GET /api/payments/status polls Stripe as a fallback which is good for webhook-less previews."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "100% (12/12 flows)"},
+  "test_credentials": "Pre-seeded: tester1@fantm.ink / testpass123 (free, has 1 completed book). Freshly registered during tests: test_xdgsjmvfgh@fantm.ink and test_jjzu48z1qu@fantm.ink (both free, testpass123). Stripe test card 4242 4242 4242 4242 (not exercised — did not complete checkout to avoid real subscription creation).",
+  "seed_data_creation": "Created 3 test users (test_*@fantm.ink) with 1 fully generated 5-chapter book ('The Eternal Vigil') on one of them. Left in DB for E1's inspection; safe because emails are TEST_-prefixed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend regression at /app/backend/tests/backend_test.py (~4s runtime, 19 tests, all pass). It exercises auth, free-tier gating, book listing, chapter listing, PDF/edit 403, Stripe checkout URL. When testing Groq generation end-to-end, budget ~90s. When testing full paid Stripe checkout, use test card 4242 4242 4242 4242 with a fresh registered user (existing users may already be premium after prior tests). Illustrations feature is intentionally deferred; do not report the 'coming soon' placeholder as a bug.",
+  "rca of the issue": "No unresolved issues. Only minor RCA: /api/payments/checkout returning 500 for unknown lookup_key stems from stripe.Price.list() returning empty and the handler raising HTTPException(500, ...) — should be reclassified as HTTPException(400, ...) since it's client-supplied input. Trivial one-line change."
+}

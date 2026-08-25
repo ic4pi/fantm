@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 3: full Neural Credit (NC) economy replacement verified end-to-end. Backend: 22/22 pytest passing (fully rewritten backend_test.py against new schema — apprentice/wordsmith/laureate tiers, /api/credits/* catalog, style gating, 402 on insufficient NC, chimera validation, new checkout schema {purpose, key, origin_url} for subscription/store/refill, laureate chimera reader + no-tier-gate chapter edit). Frontend: full APPRENTICE journey passed (fresh register → navbar shows Apprentice + 3,333 NC → dashboard shows '3,333 NC · Apprentice tier' with Store button, no 'Go Premium' → /books/new only house-style selectable with all four locked styles + chimera carrying disabled attribute → cost estimate reactive (short=4,500 NC, medium=7,200 NC, long=10,800 NC) → submit triggers InsufficientCreditsModal → store link → /store shows all 3 tier cards, tier-current-apprentice marker, 5 store items, 3 refill packs, credit-ledger with welcome stipend → refill-buy-small redirects to real checkout.stripe.com/c/pay/cs_test_... session page showing 'Small Stack (10,000 NC) US$5.00'). Full LAUREATE journey passed (tester1 login → navbar 'Laureate' 333,884 NC → /store shows tier-current-laureate → /books/new all 6 styles unlocked including chimera → clicking chimera reveals both chimera-style-a and chimera-style-b dropdowns → /books/6a74bc8109ac96789a7c87e2/read shows real cover image, real per-chapter illustration, edit button enabled (no tier gate), pdf export button labeled 'export pdf' since already unlocked). Dashboard regression clean: shows credit balance + Store button, no legacy 'Go Premium' / 1-book-limit copy. Skipped the optional full end-to-end regeneration timing test (~90s) since backend book creation & burn accounting was already exhaustively verified via curl this iteration per the review request context.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "pricing.py is cleanly separated as pure config (no DB/auth imports) — good. TIERS/WRITER_STYLES/STORE_ITEMS/REFILL_PACKS use consistent dict-of-dicts shape and helpers (allowed_styles_for_tier, style_multiplier, estimate_word_cost) keep the math out of routers.",
+    "deps.py extraction of get_current_user to break auth.py↔credits.py circular import is correct and minimal.",
+    "credits.adjust_balance uses find_one_and_update with $inc + a separate credit_transactions insert — this is NOT atomic (a crash between them yields drift). Non-critical for MVP but worth noting; would need a Mongo transaction or an idempotency key for real-money-adjacent ledger integrity once $NEUR is real.",
+    "payments._finalize_paid_transaction relies on caller's payment_status transition (guarded by update_one with $ne:paid) to enforce exactly-once — correct pattern for both the status-poll and webhook paths.",
+    "books.create_book computes estimated_cost but the actual burn happens later in generation.run_generation per chapter — this means a user can start a book at ~exactly balance boundary and end up with slight overspend if actual generated word count exceeds estimate*multiplier. Consider reserving the estimated_cost up front (or capping generation to estimate) for robustness. Non-blocking for MVP.",
+    "auth.register grants stipend inline (writes credit_balance + creates ledger row) but does NOT call ensure_monthly_stipend afterwards — correct, since last_stipend_at is set to now(). Clean.",
+    "InsufficientCreditsModal replaced UpgradeModal cleanly; store link points to /store with a clear CTA. Good UX for the new economy.",
+    "One minor visual note only (not fixed): The Clockwork Requiem card on Laureate's dashboard shows 'cover locked' because illustrations_unlocked defaults False for pre-existing older books. Not a bug per new schema, but the migration story for older books is worth confirming with the product owner (should legacy premium-generated books auto-set illustrations_unlocked=true?)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (22/22)", "frontend": "100% (all UI targets verified)"},
+  "test_credentials": "Laureate: tester1@fantm.ink / testpass123 (~333K NC, owns book 6a74bc8109ac96789a7c87e2 'The Whispering Light' chimera, illustrations & PDF already unlocked). Fresh apprentice created this run: test_ui4d498644@fantm.ink / testpass123 (3,333 NC, no books). Plus prior tester2 accounts from iter 1-2 still present.",
+  "seed_data_creation": "Fresh apprentice test_ui4d498644@fantm.ink created via UI + several TEST_-prefixed apprentice users created via pytest fixtures. All safe to leave (TEST_ prefix + zero books).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend regression is now in /app/backend/tests/backend_test.py — 22 tests covering new NC economy (auth stipend, /api/credits/* catalog, style gating 403, insufficient NC 402, chimera validation, new /api/payments/checkout {purpose,key,origin_url} schema, laureate reader). Runs in ~5s. Must be run with REACT_APP_BACKEND_URL exported (test file no longer has a fallback default — fails fast if unset). LAUREATE_BOOK_ID = 6a74bc8109ac96789a7c87e2 (The Whispering Light, chimera, illustrations_unlocked=true, pdf_unlocked=true after this run). If tester1's tier ever slips below laureate, TestLaureateReader tests will fail — restore via db.users.update_one({email:'tester1@fantm.ink'},{$set:{tier:'laureate', credit_balance:333884}}). The Clockwork Requiem book (older, illustrations_unlocked=false) still exists on tester1's dashboard — this is EXPECTED behavior of the new schema and NOT a bug, though main agent may want to confirm migration policy for legacy books.",
+  "rca of the issue": "No issues found. New economy is functionally and UX-complete."
+}

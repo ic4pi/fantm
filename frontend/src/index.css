@@ -1,0 +1,226 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    font-family: "Space Mono", monospace;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #050505;
+}
+
+code {
+    font-family: "Space Mono", monospace;
+}
+
+@layer base {
+    :root {
+        --background: 0 0% 2%;
+        --foreground: 0 0% 88%;
+        --card: 0 0% 4%;
+        --card-foreground: 0 0% 88%;
+        --popover: 0 0% 4%;
+        --popover-foreground: 0 0% 88%;
+        --primary: 66 100% 50%;
+        --primary-foreground: 0 0% 4%;
+        --secondary: 0 0% 7%;
+        --secondary-foreground: 0 0% 88%;
+        --muted: 0 0% 10%;
+        --muted-foreground: 0 0% 55%;
+        --accent: 330 100% 50%;
+        --accent-foreground: 0 0% 4%;
+        --destructive: 0 84% 55%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 0 0% 13%;
+        --input: 0 0% 13%;
+        --ring: 66 100% 50%;
+        --radius: 0px;
+    }
+    .dark {
+        --background: 0 0% 2%;
+        --foreground: 0 0% 88%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+    h1, h2, h3, h4 {
+        font-family: "Cormorant Garamond", serif;
+    }
+}
+
+@layer base {
+    [data-debug-wrapper="true"] {
+        display: contents !important;
+    }
+    [data-debug-wrapper="true"] > * {
+        margin-left: inherit;
+        margin-right: inherit;
+        margin-top: inherit;
+        margin-bottom: inherit;
+        padding-left: inherit;
+        padding-right: inherit;
+        padding-top: inherit;
+        padding-bottom: inherit;
+        column-gap: inherit;
+        row-gap: inherit;
+        gap: inherit;
+        border-left-width: inherit;
+        border-right-width: inherit;
+        border-top-width: inherit;
+        border-bottom-width: inherit;
+        border-left-style: inherit;
+        border-right-style: inherit;
+        border-top-style: inherit;
+        border-bottom-style: inherit;
+        border-left-color: inherit;
+        border-right-color: inherit;
+        border-top-color: inherit;
+        border-bottom-color: inherit;
+    }
+}
+
+/* --- fantm.ink retro-futuristic spooky terminal theme --- */
+
+.scanlines {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15) 0px,
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 3px
+    );
+    mix-blend-mode: multiply;
+}
+
+.noise-grain {
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.crt-glow {
+    text-shadow: 0 0 8px rgba(230, 255, 0, 0.55);
+}
+
+.blink-cursor {
+    display: inline-block;
+    animation: blink 1s step-start infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+.terminal-border {
+    border: 1px solid hsl(var(--border));
+}
+
+.terminal-border:hover {
+    border-color: hsl(var(--primary));
+}
+
+::selection {
+    background: #E6FF00;
+    color: #050505;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+::-webkit-scrollbar-track {
+    background: #0a0a0a;
+}
+::-webkit-scrollbar-thumb {
+    background: #222;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #E6FF00;
+}
+
+/* --- ray-gun punk noir upgrade layer --- */
+
+.neon-fusion-gradient {
+    background: linear-gradient(135deg, #E6FF00 0%, #FF007F 100%);
+}
+
+.neon-border {
+    border: 1px solid rgba(230, 255, 0, 0.2);
+    transition: border-color 0.25s, box-shadow 0.25s;
+}
+.neon-border:hover {
+    border-color: rgba(230, 255, 0, 0.9);
+    box-shadow: 0 0 10px rgba(230, 255, 0, 0.5), 0 0 20px rgba(255, 0, 127, 0.3);
+}
+
+.ray-glow-hover {
+    transition: box-shadow 0.25s, transform 0.25s;
+}
+.ray-glow-hover:hover {
+    box-shadow: 0 0 10px rgba(230, 255, 0, 0.5), 0 0 20px rgba(255, 0, 127, 0.3);
+}
+
+@keyframes neon-flicker {
+    0%, 100% { opacity: 1; }
+    8% { opacity: 0.82; }
+    12% { opacity: 1; }
+    20% { opacity: 0.9; }
+    24% { opacity: 1; }
+    60% { opacity: 0.95; }
+    64% { opacity: 1; }
+}
+.neon-flicker {
+    animation: neon-flicker 6s ease-in-out infinite;
+}
+
+@keyframes glitch-in {
+    0% { clip-path: inset(0 0 92% 0); text-shadow: -3px 0 #E6FF00, 3px 0 #FF007F; opacity: 0.3; }
+    20% { clip-path: inset(0 0 60% 0); text-shadow: 3px 0 #E6FF00, -3px 0 #FF007F; opacity: 0.6; }
+    40% { clip-path: inset(0 0 30% 0); text-shadow: -2px 0 #E6FF00, 2px 0 #FF007F; opacity: 0.8; }
+    60% { clip-path: inset(0 0 10% 0); text-shadow: 2px 0 #E6FF00, -2px 0 #FF007F; opacity: 0.9; }
+    100% { clip-path: inset(0 0 0 0); text-shadow: none; opacity: 1; }
+}
+.glitch-in {
+    animation: glitch-in 0.7s steps(6, end) 1 both;
+}
+
+@keyframes fog-drift-a {
+    0% { transform: translate(-10%, -5%) scale(1); }
+    50% { transform: translate(8%, 6%) scale(1.15); }
+    100% { transform: translate(-10%, -5%) scale(1); }
+}
+@keyframes fog-drift-b {
+    0% { transform: translate(10%, 8%) scale(1.1); }
+    50% { transform: translate(-6%, -4%) scale(1); }
+    100% { transform: translate(10%, 8%) scale(1.1); }
+}
+.fog-blob-a { animation: fog-drift-a 22s ease-in-out infinite; }
+.fog-blob-b { animation: fog-drift-b 26s ease-in-out infinite; }
+
+.navbar-glass {
+    background: rgba(5, 5, 5, 0.7);
+    backdrop-filter: blur(20px);
+}
+
+body.custom-cursor-on, body.custom-cursor-on * {
+    cursor: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fog-blob-a, .fog-blob-b, .neon-flicker, .glitch-in {
+        animation: none !important;
+    }
+}

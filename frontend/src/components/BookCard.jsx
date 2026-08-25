@@ -27,12 +27,12 @@ export function BookCard({ book, onDeleted }) {
   return (
     <Link
       to={target}
-      className="group block border border-border bg-card hover:border-primary transition-colors relative overflow-hidden"
+      className="gilt-corners group block border border-border bg-card hover:border-primary/60 hover:shadow-[0_22px_48px_rgba(0,0,0,0.65),0_0_28px_rgba(111,242,212,0.09)] hover:-translate-y-1.5 transition-all duration-300 relative overflow-hidden"
       data-testid={`book-card-${book.id}`}
     >
       <button
         onClick={handleDelete}
-        className="absolute top-3 right-3 z-10 text-muted-foreground hover:text-accent opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-3 right-3 z-10 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
         data-testid={`book-delete-button-${book.id}`}
       >
         <Trash2 className="w-4 h-4" />
@@ -48,10 +48,10 @@ export function BookCard({ book, onDeleted }) {
 
       <div className="p-5">
         <Icon className="w-6 h-6 text-primary mb-4" />
-        <h3 className="font-serif text-xl text-foreground mb-1 line-clamp-2" data-testid={`book-title-${book.id}`}>
+        <h3 className="font-serif italic text-xl text-foreground mb-1 line-clamp-2" data-testid={`book-title-${book.id}`}>
           {book.title}
         </h3>
-        <p className="text-xs uppercase text-muted-foreground font-mono mb-3">{book.book_type} · {book.length}</p>
+        <p className="text-xs uppercase tracking-wide text-muted-foreground font-mono mb-3">{book.book_type} · {book.length}</p>
         <div className="flex items-center justify-between text-xs font-mono">
           <span
             className={
@@ -59,7 +59,7 @@ export function BookCard({ book, onDeleted }) {
                 ? "text-primary"
                 : book.status === "failed"
                 ? "text-destructive"
-                : "text-accent"
+                : "text-secondary"
             }
             data-testid={`book-status-${book.id}`}
           >

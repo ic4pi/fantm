@@ -7,39 +7,40 @@ body {
     font-family: "Space Mono", monospace;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-color: #050505;
+    background-color: #07070B;
 }
 
 code {
     font-family: "Space Mono", monospace;
 }
 
+/* ── the parlour — matte jet walls, one neon source, formal/lavish ── */
 @layer base {
     :root {
-        --background: 0 0% 2%;
-        --foreground: 0 0% 88%;
-        --card: 0 0% 4%;
-        --card-foreground: 0 0% 88%;
-        --popover: 0 0% 4%;
-        --popover-foreground: 0 0% 88%;
-        --primary: 66 100% 50%;
-        --primary-foreground: 0 0% 4%;
-        --secondary: 0 0% 7%;
-        --secondary-foreground: 0 0% 88%;
-        --muted: 0 0% 10%;
-        --muted-foreground: 0 0% 55%;
-        --accent: 330 100% 50%;
-        --accent-foreground: 0 0% 4%;
-        --destructive: 0 84% 55%;
+        --background: 240 20% 4%;        /* pitch — matte jet wall */
+        --foreground: 40 20% 91%;        /* ivory */
+        --card: 245 22% 8%;              /* lacquer — raised surface */
+        --card-foreground: 40 20% 91%;
+        --popover: 245 22% 8%;
+        --popover-foreground: 40 20% 91%;
+        --primary: 164 68% 69%;          /* ecto — spectral mint */
+        --primary-foreground: 240 20% 4%;
+        --secondary: 255 100% 84%;       /* seance — violet */
+        --secondary-foreground: 240 20% 4%;
+        --muted: 245 16% 12%;
+        --muted-foreground: 40 12% 55%;
+        --accent: 38 45% 58%;            /* brass — antique gilt hairlines */
+        --accent-foreground: 240 20% 4%;
+        --destructive: 0 72% 55%;
         --destructive-foreground: 0 0% 100%;
-        --border: 0 0% 13%;
-        --input: 0 0% 13%;
-        --ring: 66 100% 50%;
+        --border: 35 18% 18%;             /* dim warm hairline — brass itself stays reserved as an accent */
+        --input: 245 16% 14%;
+        --ring: 164 68% 69%;
         --radius: 0px;
     }
     .dark {
-        --background: 0 0% 2%;
-        --foreground: 0 0% 88%;
+        --background: 240 20% 4%;
+        --foreground: 40 20% 91%;
     }
 }
 
@@ -51,6 +52,10 @@ code {
         @apply bg-background text-foreground;
     }
     h1, h2, h3, h4 {
+        font-family: "Bodoni Moda", serif;
+        letter-spacing: -0.01em;
+    }
+    p, .prose-serif {
         font-family: "Cormorant Garamond", serif;
     }
 }
@@ -86,34 +91,75 @@ code {
     }
 }
 
-/* --- fantm.ink retro-futuristic spooky terminal theme --- */
+/* --- fantm.ink: the parlour --- */
 
-.scanlines {
+/* the gloss deco wall — a lattice on matte black, always present but
+   only catching light where the aura (below) falls across it */
+.wall-lattice {
     position: fixed;
     inset: 0;
-    z-index: 100;
+    z-index: 0;
     pointer-events: none;
-    background: repeating-linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0.15) 0px,
-        rgba(0, 0, 0, 0.15) 1px,
-        transparent 1px,
-        transparent 3px
-    );
-    mix-blend-mode: multiply;
+    background-image:
+        repeating-linear-gradient(45deg,  rgba(14,14,22,0.9) 0 2px, transparent 2px 22px),
+        repeating-linear-gradient(-45deg, rgba(14,14,22,0.9) 0 2px, transparent 2px 22px),
+        repeating-linear-gradient(0deg, rgba(198,161,91,0.05) 0 1px, transparent 1px 88px);
+    opacity: 0.5;
+}
+
+/* the neon aura — follows the cursor on desktop, drifts on touch devices
+   (wired up in App.js). tints the room and glints the wall lattice. */
+.aura-glow {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: radial-gradient(38rem 38rem at var(--mx, 72%) var(--my, 28%),
+        rgba(111,242,212,0.16) 0%,
+        rgba(169,140,255,0.10) 32%,
+        transparent 68%);
+}
+.wall-glint {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.3;
+    background-image:
+        repeating-linear-gradient(45deg,  rgba(111,242,212,0.5) 0 2px, transparent 2px 22px),
+        repeating-linear-gradient(-45deg, rgba(169,140,255,0.4) 0 2px, transparent 2px 22px);
+    -webkit-mask-image: radial-gradient(26rem 26rem at var(--mx, 72%) var(--my, 28%), #000 0%, transparent 70%);
+    mask-image: radial-gradient(26rem 26rem at var(--mx, 72%) var(--my, 28%), #000 0%, transparent 70%);
 }
 
 .noise-grain {
     position: fixed;
     inset: 0;
-    z-index: 99;
+    z-index: 2;
     pointer-events: none;
-    opacity: 0.035;
+    opacity: 0.05;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* two slow-drifting presences behind the content */
+.fog-blob-a, .fog-blob-b {
+    position: fixed;
+    z-index: 1;
+    pointer-events: none;
+    width: 44vmax;
+    height: 44vmax;
+    border-radius: 50%;
+    filter: blur(48px);
+}
+.fog-blob-a {
+    background: radial-gradient(circle, rgba(169,140,255,0.09) 0%, transparent 62%);
+}
+.fog-blob-b {
+    background: radial-gradient(circle, rgba(111,242,212,0.07) 0%, transparent 62%);
+}
+
 .crt-glow {
-    text-shadow: 0 0 8px rgba(230, 255, 0, 0.55);
+    text-shadow: 0 0 10px rgba(111, 242, 212, 0.45);
 }
 
 .blink-cursor {
@@ -133,44 +179,61 @@ code {
     border-color: hsl(var(--primary));
 }
 
+/* gilt corner ticks — the formal-lavish framing device used on every
+   panel/card, standing in for a border-radius the rest of the app
+   deliberately doesn't use */
+.gilt-corners {
+    position: relative;
+}
+.gilt-corners::before,
+.gilt-corners::after {
+    content: "";
+    position: absolute;
+    width: 11px;
+    height: 11px;
+    border: 1px solid #C6A15B;
+    opacity: 0.65;
+    pointer-events: none;
+}
+.gilt-corners::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+.gilt-corners::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
 ::selection {
-    background: #E6FF00;
-    color: #050505;
+    background: #6FF2D4;
+    color: #07070B;
 }
 
 ::-webkit-scrollbar {
     width: 10px;
 }
 ::-webkit-scrollbar-track {
-    background: #0a0a0a;
+    background: #0a0a0f;
 }
 ::-webkit-scrollbar-thumb {
-    background: #222;
+    background: #26263a;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: #E6FF00;
+    background: #6FF2D4;
 }
 
-/* --- ray-gun punk noir upgrade layer --- */
-
 .neon-fusion-gradient {
-    background: linear-gradient(135deg, #E6FF00 0%, #FF007F 100%);
+    background: linear-gradient(135deg, #6FF2D4 0%, #A98CFF 100%);
 }
 
 .neon-border {
-    border: 1px solid rgba(230, 255, 0, 0.2);
+    border: 1px solid rgba(198, 161, 91, 0.22);
     transition: border-color 0.25s, box-shadow 0.25s;
 }
 .neon-border:hover {
-    border-color: rgba(230, 255, 0, 0.9);
-    box-shadow: 0 0 10px rgba(230, 255, 0, 0.5), 0 0 20px rgba(255, 0, 127, 0.3);
+    border-color: rgba(111, 242, 212, 0.7);
+    box-shadow: 0 0 10px rgba(111, 242, 212, 0.35), 0 0 22px rgba(169, 140, 255, 0.15);
 }
 
 .ray-glow-hover {
     transition: box-shadow 0.25s, transform 0.25s;
 }
 .ray-glow-hover:hover {
-    box-shadow: 0 0 10px rgba(230, 255, 0, 0.5), 0 0 20px rgba(255, 0, 127, 0.3);
+    box-shadow: 0 0 10px rgba(111, 242, 212, 0.35), 0 0 22px rgba(169, 140, 255, 0.15);
 }
 
 @keyframes neon-flicker {
@@ -187,10 +250,10 @@ code {
 }
 
 @keyframes glitch-in {
-    0% { clip-path: inset(0 0 92% 0); text-shadow: -3px 0 #E6FF00, 3px 0 #FF007F; opacity: 0.3; }
-    20% { clip-path: inset(0 0 60% 0); text-shadow: 3px 0 #E6FF00, -3px 0 #FF007F; opacity: 0.6; }
-    40% { clip-path: inset(0 0 30% 0); text-shadow: -2px 0 #E6FF00, 2px 0 #FF007F; opacity: 0.8; }
-    60% { clip-path: inset(0 0 10% 0); text-shadow: 2px 0 #E6FF00, -2px 0 #FF007F; opacity: 0.9; }
+    0% { clip-path: inset(0 0 92% 0); text-shadow: -3px 0 #6FF2D4, 3px 0 #A98CFF; opacity: 0.3; }
+    20% { clip-path: inset(0 0 60% 0); text-shadow: 3px 0 #6FF2D4, -3px 0 #A98CFF; opacity: 0.6; }
+    40% { clip-path: inset(0 0 30% 0); text-shadow: -2px 0 #6FF2D4, 2px 0 #A98CFF; opacity: 0.8; }
+    60% { clip-path: inset(0 0 10% 0); text-shadow: 2px 0 #6FF2D4, -2px 0 #A98CFF; opacity: 0.9; }
     100% { clip-path: inset(0 0 0 0); text-shadow: none; opacity: 1; }
 }
 .glitch-in {
@@ -207,12 +270,13 @@ code {
     50% { transform: translate(-6%, -4%) scale(1); }
     100% { transform: translate(10%, 8%) scale(1.1); }
 }
-.fog-blob-a { animation: fog-drift-a 22s ease-in-out infinite; }
-.fog-blob-b { animation: fog-drift-b 26s ease-in-out infinite; }
+.fog-blob-a { animation: fog-drift-a 46s ease-in-out infinite; }
+.fog-blob-b { animation: fog-drift-b 63s ease-in-out infinite; }
 
 .navbar-glass {
-    background: rgba(5, 5, 5, 0.7);
-    backdrop-filter: blur(20px);
+    background: rgba(7, 7, 11, 0.62);
+    backdrop-filter: blur(22px) saturate(120%);
+    -webkit-backdrop-filter: blur(22px) saturate(120%);
 }
 
 body.custom-cursor-on, body.custom-cursor-on * {
@@ -224,3 +288,4 @@ body.custom-cursor-on, body.custom-cursor-on * {
         animation: none !important;
     }
 }
+

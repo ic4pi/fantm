@@ -149,7 +149,10 @@ async def refresh(request: Request, response: Response):
         raise HTTPException(401, "Invalid refresh token")
     if payload.get("type") != "refresh":
         raise HTTPException(401, "Invalid token type")
-    user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+    subject = payload.get("sub")
+    if not subject or not ObjectId.is_valid(subject):
+        raise HTTPException(401, "Invalid refresh token")
+    user = await db.users.find_one({"_id": ObjectId(subject)})
     if not user:
         raise HTTPException(401, "User not found")
     access_token = create_access_token(str(user["_id"]), user["email"])

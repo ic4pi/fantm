@@ -11,7 +11,7 @@ from groq import Groq
 from json_repair import repair_json
 import pricing
 import chat_providers
-from credits import adjust_balance
+from credits import settle_reservation
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +208,8 @@ async def run_generation(book_id: str, db):
     if not book_doc:
         return
     user_id = book_doc["user_id"]
+    reserved = book_doc.get("reserved_nc", 0)
+    actual_burn = 0
     multiplier = pricing.style_multiplier(
         book_doc.get("style", "house"),
         style_secondary_a=book_doc.get("style_secondary_a"),
@@ -255,7 +257,8 @@ async def run_generation(book_id: str, db):
             await db.chapters.update_one({"_id": res.inserted_id}, {"$set": {
                 "content": content, "word_count": word_count, "status": "done", "updated_at": datetime.now(timezone.utc),
             }})
-            await adjust_balance(user_id, -burn, "burn", f"Chapter {idx + 1} generation ({word_count} words)", related_book_id=book_id)
+            actual_burn += burn
+            await db.books.update_one({"_id": oid}, {"$set": {"burned_nc": actual_burn}})
 
             state = await asyncio.to_thread(update_story_state, book_doc, content, len(chapters_brief))
             book_doc["running_summary"] = state.get("running_summary", book_doc.get("running_summary", ""))
@@ -272,3 +275,24 @@ async def run_generation(book_id: str, db):
     except Exception as e:
         logger.exception("Generation failed for book %s", book_id)
         await db.books.update_one({"_id": oid}, {"$set": {"status": "failed", "error": str(e), "updated_at": datetime.now(timezone.utc)}})
+    finally:
+        # The estimate was already debited as a hold when the book was
+        # requested; this reconciles it against the words actually written, so
+        # a book that came in under estimate refunds the difference and one
+        # that failed part-way only charges for the chapters it produced.
+        # Guarded by a one-shot flag: settling twice would refund twice.
+        claimed = await db.books.update_one(
+            {"_id": oid, "settled": {"$ne": True}},
+            {"$set": {"settled": True, "burned_nc": actual_burn}},
+        )
+        if claimed.modified_count:
+            try:
+                fresh = await db.books.find_one({"_id": oid}, {"title": 1, "status": 1})
+                title = (fresh or {}).get("title") or "book"
+                if (fresh or {}).get("status") == "failed":
+                    note = f"Settled failed generation of '{title}' ({actual_burn} NC used of {reserved} NC reserved)"
+                else:
+                    note = f"Settled generation of '{title}' ({actual_burn} NC used of {reserved} NC reserved)"
+                await settle_reservation(user_id, reserved, actual_burn, note, related_book_id=book_id)
+            except Exception:
+                logger.exception("Could not settle credit reservation for book %s", book_id)

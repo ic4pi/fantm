@@ -10,8 +10,11 @@ import pricing
 from credits import adjust_balance
 from auth import serialize_user
 
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or "sk_test_emergent"
-STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+# No placeholder fallback: a missing key used to be swapped for a fake one, so
+# a misconfigured deploy took real checkout attempts and failed at Stripe
+# instead of refusing to boot. config.validate_required_env enforces presence.
+stripe.api_key = os.environ["STRIPE_SECRET_KEY"]
+STRIPE_WEBHOOK_SECRET = os.environ["STRIPE_WEBHOOK_SECRET"]
 
 router = APIRouter(prefix="/api")
 
@@ -96,8 +99,11 @@ async def _finalize_paid_transaction(record: dict, subscription_id: str = None):
 
 
 @router.get("/payments/status/{session_id}")
-async def get_status(session_id: str):
-    record = await db.payment_transactions.find_one({"session_id": session_id})
+async def get_status(session_id: str, user=Depends(get_current_user)):
+    # Authenticated and owner-scoped: this endpoint does not merely report
+    # status, it settles the transaction and grants credits, so it must not be
+    # reachable by anyone holding (or guessing) a session id.
+    record = await db.payment_transactions.find_one({"session_id": session_id, "user_id": str(user["_id"])})
     if not record:
         raise HTTPException(404, "Transaction not found")
     if record.get("payment_status") != "paid":

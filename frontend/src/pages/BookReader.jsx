@@ -34,6 +34,10 @@ export default function BookReader() {
 
   useEffect(() => {
     if (active) setDraft(active.content);
+    // Deliberately narrow: keying on the full `active` object would re-sync
+    // on every background refetch (a new object with the same id),
+    // clobbering whatever the user is mid-edit typing into the draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id]);
 
   const handleSave = async () => {

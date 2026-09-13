@@ -6,12 +6,12 @@ import logging
 import hashlib
 from urllib.parse import quote
 from datetime import datetime, timezone
-from bson import ObjectId
 from groq import Groq
 from json_repair import repair_json
 import pricing
 import chat_providers
 from credits import settle_reservation
+from db import get_pool
 
 logger = logging.getLogger(__name__)
 
@@ -202,12 +202,13 @@ def build_chapter_illustration_url(book_id: str, idx: int, chapter_title: str, s
     return build_illustration_url(f"{chapter_title}: {summary[:200]}", _base_seed(book_id) + idx + 1, width=1024, height=576)
 
 
-async def run_generation(book_id: str, db):
-    oid = ObjectId(book_id)
-    book_doc = await db.books.find_one({"_id": oid})
-    if not book_doc:
+async def run_generation(book_id: str):
+    pool = await get_pool()
+    book_row = await pool.fetchrow("select * from books where id = $1", book_id)
+    if not book_row:
         return
-    user_id = book_doc["user_id"]
+    book_doc = dict(book_row)
+    user_id = str(book_doc["user_id"])
     reserved = book_doc.get("reserved_nc", 0)
     actual_burn = 0
     multiplier = pricing.style_multiplier(
@@ -221,75 +222,68 @@ async def run_generation(book_id: str, db):
         title = outline.get("title", book_doc["title"])
         premise = outline.get("premise", "")
         cover_image_url = build_cover_url(book_id, title, premise)
-        await db.books.update_one({"_id": oid}, {"$set": {
-            "title": title,
-            "premise": premise,
-            "characters": outline.get("characters", []),
-            "plot_threads": outline.get("plot_threads", []),
-            "outline": chapters_brief,
-            "total_chapters": len(chapters_brief),
-            "cover_image_url": cover_image_url,
-            "status": "generating",
-            "updated_at": datetime.now(timezone.utc),
-        }})
-        book_doc = await db.books.find_one({"_id": oid})
+        await pool.execute(
+            """update books set title=$2, premise=$3, characters=$4, plot_threads=$5, outline=$6,
+                 total_chapters=$7, cover_image_url=$8, status='generating', updated_at=$9
+               where id=$1""",
+            book_id, title, premise, outline.get("characters", []), outline.get("plot_threads", []),
+            chapters_brief, len(chapters_brief), cover_image_url, datetime.now(timezone.utc),
+        )
+        book_row = await pool.fetchrow("select * from books where id = $1", book_id)
+        book_doc = dict(book_row)
 
         for idx, brief in enumerate(chapters_brief):
-            chapter_doc = {
-                "book_id": book_id,
-                "index": idx,
-                "title": brief.get("title", f"Chapter {idx + 1}"),
-                "content": "",
-                "word_count": 0,
-                "status": "generating",
-                "image_url": build_chapter_illustration_url(book_id, idx, brief.get("title", ""), brief.get("summary", "")),
-                "created_at": datetime.now(timezone.utc),
-                "updated_at": datetime.now(timezone.utc),
-            }
-            res = await db.chapters.insert_one(chapter_doc)
-            await db.books.update_one({"_id": oid}, {"$set": {"current_chapter": idx + 1, "updated_at": datetime.now(timezone.utc)}})
+            chapter_row = await pool.fetchrow(
+                """insert into chapters (book_id, index, title, content, word_count, status, image_url, created_at, updated_at)
+                   values ($1,$2,$3,'',0,'generating',$4,$5,$5) returning id""",
+                book_id, idx, brief.get("title", f"Chapter {idx + 1}"),
+                build_chapter_illustration_url(book_id, idx, brief.get("title", ""), brief.get("summary", "")),
+                datetime.now(timezone.utc),
+            )
+            chapter_id = chapter_row["id"]
+            await pool.execute("update books set current_chapter=$2, updated_at=$3 where id=$1", book_id, idx + 1, datetime.now(timezone.utc))
 
             content = await asyncio.to_thread(
                 generate_chapter_content, book_doc, brief, idx, len(chapters_brief), chapters_brief[idx + 1:]
             )
             word_count = len(content.split())
             burn = round(word_count * multiplier)
-            await db.chapters.update_one({"_id": res.inserted_id}, {"$set": {
-                "content": content, "word_count": word_count, "status": "done", "updated_at": datetime.now(timezone.utc),
-            }})
+            await pool.execute(
+                "update chapters set content=$2, word_count=$3, status='done', updated_at=$4 where id=$1",
+                chapter_id, content, word_count, datetime.now(timezone.utc),
+            )
             actual_burn += burn
-            await db.books.update_one({"_id": oid}, {"$set": {"burned_nc": actual_burn}})
+            await pool.execute("update books set burned_nc=$2 where id=$1", book_id, actual_burn)
 
             state = await asyncio.to_thread(update_story_state, book_doc, content, len(chapters_brief))
             book_doc["running_summary"] = state.get("running_summary", book_doc.get("running_summary", ""))
             book_doc["characters"] = state.get("characters", book_doc.get("characters", []))
             book_doc["plot_threads"] = state.get("plot_threads", book_doc.get("plot_threads", []))
-            await db.books.update_one({"_id": oid}, {"$set": {
-                "running_summary": book_doc["running_summary"],
-                "characters": book_doc["characters"],
-                "plot_threads": book_doc["plot_threads"],
-                "updated_at": datetime.now(timezone.utc),
-            }})
+            await pool.execute(
+                "update books set running_summary=$2, characters=$3, plot_threads=$4, updated_at=$5 where id=$1",
+                book_id, book_doc["running_summary"], book_doc["characters"], book_doc["plot_threads"], datetime.now(timezone.utc),
+            )
 
-        await db.books.update_one({"_id": oid}, {"$set": {"status": "completed", "updated_at": datetime.now(timezone.utc)}})
+        await pool.execute("update books set status='completed', updated_at=$2 where id=$1", book_id, datetime.now(timezone.utc))
     except Exception as e:
         logger.exception("Generation failed for book %s", book_id)
-        await db.books.update_one({"_id": oid}, {"$set": {"status": "failed", "error": str(e), "updated_at": datetime.now(timezone.utc)}})
+        await pool.execute("update books set status='failed', error=$2, updated_at=$3 where id=$1", book_id, str(e), datetime.now(timezone.utc))
     finally:
         # The estimate was already debited as a hold when the book was
         # requested; this reconciles it against the words actually written, so
         # a book that came in under estimate refunds the difference and one
         # that failed part-way only charges for the chapters it produced.
         # Guarded by a one-shot flag: settling twice would refund twice.
-        claimed = await db.books.update_one(
-            {"_id": oid, "settled": {"$ne": True}},
-            {"$set": {"settled": True, "burned_nc": actual_burn}},
+        claimed = await pool.execute(
+            "update books set settled=true, burned_nc=$2 where id=$1 and settled=false",
+            book_id, actual_burn,
         )
-        if claimed.modified_count:
+        if claimed == "UPDATE 1":
             try:
-                fresh = await db.books.find_one({"_id": oid}, {"title": 1, "status": 1})
-                title = (fresh or {}).get("title") or "book"
-                if (fresh or {}).get("status") == "failed":
+                fresh = await pool.fetchrow("select title, status from books where id = $1", book_id)
+                title = (fresh["title"] if fresh else None) or "book"
+                status = fresh["status"] if fresh else None
+                if status == "failed":
                     note = f"Settled failed generation of '{title}' ({actual_burn} NC used of {reserved} NC reserved)"
                 else:
                     note = f"Settled generation of '{title}' ({actual_burn} NC used of {reserved} NC reserved)"

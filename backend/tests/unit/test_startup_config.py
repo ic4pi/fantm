@@ -9,7 +9,7 @@ import pytest
 import config
 
 COMPLETE = {
-    "MONGO_URL": "mongodb://localhost:27017", "DB_NAME": "fantm",
+    "DATABASE_URL": "postgresql://postgres:postgres@localhost/fantm",
     "JWT_SECRET": "s" * 48, "GROQ_API_KEY": "gsk_live",
     "STRIPE_SECRET_KEY": "sk_live", "STRIPE_WEBHOOK_SECRET": "whsec_live",
     "CORS_ORIGINS": "https://fantm.ink",

@@ -1,7 +1,7 @@
 # fantm.ink — AI Book Generation SaaS
 
 ## Original Problem Statement
-A SaaS that generates professional-quality novels, memoirs, and biographies from a user prompt using a block-based generation algorithm (running summaries, character tracking, plot-thread continuity) to keep long-form stories coherent. Free/Normal tier + paid Premium tier (illustrations, formatting, editing, PDF export). Rebuilt fresh on FastAPI + MongoDB (old Grok/Supabase/Square integrations were dead).
+A SaaS that generates professional-quality novels, memoirs, and biographies from a user prompt using a block-based generation algorithm (running summaries, character tracking, plot-thread continuity) to keep long-form stories coherent. Free/Normal tier + paid Premium tier (illustrations, formatting, editing, PDF export). Rebuilt fresh on FastAPI + MongoDB (old Grok/Supabase/Square integrations were dead), then moved back onto Postgres/Supabase (2026-09-13) — the Mongo layer is gone.
 
 ## User Choices Made
 - Text generation: Groq (llama-3.3-70b-versatile), BYOK — user-provided key
@@ -17,7 +17,7 @@ A SaaS that generates professional-quality novels, memoirs, and biographies from
 - Hobbyists generating fiction for fun/self-publishing
 
 ## Architecture
-- **Backend (FastAPI + Motor/MongoDB)**: `server.py` (app + CORS + startup indexes), `db.py` (shared Mongo client), `models.py` (PyObjectId/BaseDocument/User/Book/Chapter), `auth.py` (JWT cookie auth), `books.py` (CRUD + tier gating + PDF export), `generation.py` (Groq block-based generation engine, async background task), `pdf_export.py` (reportlab A5 PDF), `payments.py` (Stripe checkout/status/webhook), `setup_stripe.py` (catalog seed script).
+- **Backend (FastAPI + asyncpg/Postgres via Supabase)**: `server.py` (app + CORS + startup pool connect), `db.py` (shared asyncpg pool, jsonb codec), `config.py` (boot-time env validation), `auth.py` (JWT cookie auth), `books.py` (CRUD + tier gating + PDF export + credit reservation), `credits.py` (atomic reserve/settle NC economy), `generation.py` (Groq block-based generation engine, async background task), `pdf_export.py` (reportlab A5 PDF), `payments.py` (Stripe checkout/status/webhook), `setup_stripe.py` (catalog seed script). Schema lives in `migrations/001_fantm_schema.sql`.
 - **Frontend (React + Tailwind + shadcn)**: `AuthContext`, `Navbar`, `ProtectedRoute`, pages: Landing, Login, Register, Dashboard, CreateBook, BookGeneration (live polling via react-query), BookReader (editor + PDF export + illustration placeholder), PaymentSuccess/Cancel, `UpgradeModal`.
 - **Generation algorithm**: Groq call 1 generates outline (title/premise/characters/plot_threads/chapter briefs) sized by length (short=5/medium=8/long=12). Then per chapter: Groq call generates prose using running_summary + characters + plot_threads + chapter brief; Groq call 2 updates running_summary/characters/plot_threads for the next chapter. Runs as `asyncio.create_task` background job, polled by frontend every 2.5s.
 

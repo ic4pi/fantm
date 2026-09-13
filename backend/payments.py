@@ -1,14 +1,15 @@
 import os
-import stripe
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Request, Depends
+
+import stripe
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from bson import ObjectId
-from db import db
-from deps import get_current_user
+
 import pricing
-from credits import adjust_balance
 from auth import serialize_user
+from credits import adjust_balance
+from db import get_pool
+from deps import get_current_user
 
 # No placeholder fallback: a missing key used to be swapped for a fake one, so
 # a misconfigured deploy took real checkout attempts and failed at Stripe
@@ -56,22 +57,19 @@ async def create_checkout(req: CheckoutRequest, user=Depends(get_current_user)):
         mode="subscription" if price.recurring else "payment",
         success_url=f"{req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{req.origin_url}/payment/cancel",
-        metadata={"user_id": str(user["_id"]), "purpose": req.purpose, "key": req.key, "lookup_key": lookup_key},
+        metadata={"user_id": str(user["id"]), "purpose": req.purpose, "key": req.key, "lookup_key": lookup_key},
         managed_payments={"enabled": True},
     )
-    await db.payment_transactions.insert_one({
-        "session_id": session.id,
-        "user_id": str(user["_id"]),
-        "purpose": req.purpose,
-        "key": req.key,
-        "lookup_key": lookup_key,
-        "amount": (price.unit_amount or 0) / 100,
-        "currency": price.currency,
-        "status": "initiated",
-        "payment_status": "pending",
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
-    })
+    pool = await get_pool()
+    now = datetime.now(timezone.utc)
+    await pool.execute(
+        """insert into payment_transactions (
+             session_id, user_id, purpose, key, lookup_key, amount, currency,
+             status, payment_status, created_at, updated_at
+           ) values ($1,$2,$3,$4,$5,$6,$7,'initiated','pending',$8,$8)""",
+        session.id, str(user["id"]), req.purpose, req.key, lookup_key,
+        (price.unit_amount or 0) / 100, price.currency, now,
+    )
     return {"checkout_url": session.url, "session_id": session.id}
 
 
@@ -80,12 +78,13 @@ async def _finalize_paid_transaction(record: dict, subscription_id: str = None):
     purpose = record.get("purpose")
     user_id = record["user_id"]
     key = record.get("key")
+    pool = await get_pool()
     if purpose == "subscription":
         tier = pricing.TIERS.get(key)
         if tier:
-            await db.users.update_one(
-                {"_id": ObjectId(user_id)},
-                {"$set": {"tier": key, "stripe_subscription_id": subscription_id}},
+            await pool.execute(
+                "update users set tier=$2, stripe_subscription_id=$3 where id=$1",
+                user_id, key, subscription_id,
             )
             await adjust_balance(user_id, tier["stipend"], "stipend", f"Subscription activated ({tier['name']})")
     elif purpose == "store":
@@ -103,24 +102,27 @@ async def get_status(session_id: str, user=Depends(get_current_user)):
     # Authenticated and owner-scoped: this endpoint does not merely report
     # status, it settles the transaction and grants credits, so it must not be
     # reachable by anyone holding (or guessing) a session id.
-    record = await db.payment_transactions.find_one({"session_id": session_id, "user_id": str(user["_id"])})
+    pool = await get_pool()
+    record = await pool.fetchrow(
+        "select * from payment_transactions where session_id = $1 and user_id = $2",
+        session_id, str(user["id"]),
+    )
     if not record:
         raise HTTPException(404, "Transaction not found")
+    record = dict(record)
     if record.get("payment_status") != "paid":
         try:
             s = stripe.checkout.Session.retrieve(session_id)
             if s.payment_status == "paid" or s.status == "complete":
-                result = await db.payment_transactions.update_one(
-                    {"session_id": session_id, "payment_status": {"$ne": "paid"}},
-                    {"$set": {
-                        "status": "completed", "payment_status": "paid",
-                        "stripe_subscription_id": s.subscription,
-                        "updated_at": datetime.now(timezone.utc),
-                    }},
+                result = await pool.execute(
+                    """update payment_transactions set status='completed', payment_status='paid',
+                         stripe_subscription_id=$2, updated_at=$3
+                       where session_id=$1 and payment_status != 'paid'""",
+                    session_id, s.subscription, datetime.now(timezone.utc),
                 )
-                if result.modified_count:
+                if result == "UPDATE 1":
                     await _finalize_paid_transaction(record, subscription_id=s.subscription)
-                record = await db.payment_transactions.find_one({"session_id": session_id})
+                record = dict(await pool.fetchrow("select * from payment_transactions where session_id = $1", session_id))
         except stripe.error.StripeError:
             pass
     return {"session_id": record["session_id"], "status": record["status"], "payment_status": record["payment_status"]}
@@ -136,20 +138,23 @@ async def stripe_webhook(request: Request):
         raise HTTPException(400, "Invalid signature")
     obj, t = event["data"]["object"], event["type"]
     if t == "checkout.session.completed":
-        record = await db.payment_transactions.find_one({"session_id": obj["id"]})
-        result = await db.payment_transactions.update_one(
-            {"session_id": obj["id"], "payment_status": {"$ne": "paid"}},
-            {"$set": {
-                "status": "completed", "payment_status": obj.get("payment_status", "paid"),
-                "stripe_subscription_id": obj.get("subscription"), "updated_at": datetime.now(timezone.utc),
-            }},
-        )
-        if result.modified_count and record:
-            await _finalize_paid_transaction(record, subscription_id=obj.get("subscription"))
+        pool = await get_pool()
+        record = await pool.fetchrow("select * from payment_transactions where session_id = $1", obj["id"])
+        if record:
+            record = dict(record)
+            result = await pool.execute(
+                """update payment_transactions set status='completed', payment_status=$2,
+                     stripe_subscription_id=$3, updated_at=$4
+                   where session_id=$1 and payment_status != 'paid'""",
+                obj["id"], obj.get("payment_status", "paid"), obj.get("subscription"), datetime.now(timezone.utc),
+            )
+            if result == "UPDATE 1":
+                await _finalize_paid_transaction(record, subscription_id=obj.get("subscription"))
     return {"status": "ok"}
 
 
 @router.get("/payments/me")
 async def payment_me(user=Depends(get_current_user)):
-    fresh = await db.users.find_one({"_id": user["_id"]})
-    return serialize_user(fresh)
+    pool = await get_pool()
+    fresh = await pool.fetchrow("select * from users where id = $1", user["id"])
+    return serialize_user(dict(fresh))

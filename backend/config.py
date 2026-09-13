@@ -9,8 +9,7 @@ one loud failure at import time, before the process starts serving.
 import os
 
 REQUIRED_ENV = {
-    "MONGO_URL": "MongoDB connection string.",
-    "DB_NAME": "MongoDB database name.",
+    "DATABASE_URL": "Postgres connection string (Supabase: Project Settings -> Database -> Connection string).",
     "JWT_SECRET": "Secret used to sign access and refresh tokens.",
     "GROQ_API_KEY": "Groq key for the House model (outlines, continuity, free-tier prose).",
     "STRIPE_SECRET_KEY": "Stripe secret key used to create checkout sessions.",

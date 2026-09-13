@@ -1,8 +1,10 @@
 import os
+import uuid
+
 import jwt
-from fastapi import Request, HTTPException
-from bson import ObjectId
-from db import db
+from fastapi import HTTPException, Request
+
+from db import get_pool
 
 JWT_ALGORITHM = "HS256"
 
@@ -11,14 +13,15 @@ def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
 
 
-def to_object_id(value: str, detail: str = "Not found") -> ObjectId:
-    """Parse a path/body-supplied id into an ObjectId, turning a malformed one
-    into the 404 the caller deserves. Bare ObjectId() raises InvalidId, which
-    is not an HTTPException and so surfaces as a 500 on every route that takes
-    an id in its URL."""
-    if not ObjectId.is_valid(value):
+def to_uuid(value: str, detail: str = "Not found") -> str:
+    """Validate a path/body-supplied id before it reaches a query. A malformed
+    value fed straight to asyncpg raises DataError, which is not an
+    HTTPException and would surface as a 500 on every route that takes an id
+    in its URL — this turns it into the 404 the caller deserves instead."""
+    try:
+        return str(uuid.UUID(value))
+    except (ValueError, AttributeError, TypeError):
         raise HTTPException(status_code=404, detail=detail)
-    return ObjectId(value)
 
 
 async def get_current_user(request: Request) -> dict:
@@ -38,9 +41,12 @@ async def get_current_user(request: Request) -> dict:
     if payload.get("type") != "access":
         raise HTTPException(status_code=401, detail="Invalid token type")
     subject = payload.get("sub")
-    if not subject or not ObjectId.is_valid(subject):
+    try:
+        user_id = str(uuid.UUID(subject))
+    except (ValueError, AttributeError, TypeError):
         raise HTTPException(status_code=401, detail="Invalid token subject")
-    user = await db.users.find_one({"_id": ObjectId(subject)})
+    pool = await get_pool()
+    user = await pool.fetchrow("select * from users where id = $1", user_id)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-    return user
+    return dict(user)

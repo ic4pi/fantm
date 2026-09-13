@@ -1,65 +1,63 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
 from fastapi import APIRouter, Depends
-from bson import ObjectId
-from db import db
-from deps import get_current_user
+
 import pricing
+from db import get_pool
+from deps import get_current_user
 
 router = APIRouter(prefix="/api/credits")
 
 
 async def get_balance(user_id: str) -> int:
-    user = await db.users.find_one({"_id": ObjectId(user_id)}, {"credit_balance": 1})
-    return (user or {}).get("credit_balance", 0)
+    pool = await get_pool()
+    return await pool.fetchval("select credit_balance from users where id = $1", user_id) or 0
 
 
 async def _log_transaction(user_id: str, amount: int, tx_type: str, description: str,
-                          balance_after: int, related_book_id: str = None):
-    await db.credit_transactions.insert_one({
-        "user_id": user_id,
-        "type": tx_type,
-        "amount": amount,
-        "balance_after": balance_after,
-        "description": description,
-        "related_book_id": related_book_id,
-        "created_at": datetime.now(timezone.utc),
-    })
+                            balance_after: int, related_book_id: str = None):
+    pool = await get_pool()
+    await pool.execute(
+        """insert into credit_transactions (user_id, type, amount, balance_after, description, related_book_id)
+           values ($1, $2, $3, $4, $5, $6)""",
+        user_id, tx_type, amount, balance_after, description, related_book_id,
+    )
 
 
 async def adjust_balance(user_id: str, amount: int, tx_type: str, description: str, related_book_id: str = None) -> int:
     """Unguarded balance change. Only safe for credits *added* (stipends,
     purchases, refunds) or for debits whose affordability was already
     established atomically. To spend credits, use reserve_credits."""
-    updated = await db.users.find_one_and_update(
-        {"_id": ObjectId(user_id)},
-        {"$inc": {"credit_balance": amount}},
-        return_document=True,
+    pool = await get_pool()
+    new_balance = await pool.fetchval(
+        "update users set credit_balance = credit_balance + $2 where id = $1 returning credit_balance",
+        user_id, amount,
     )
-    new_balance = updated.get("credit_balance", 0) if updated else 0
+    new_balance = new_balance if new_balance is not None else 0
     await _log_transaction(user_id, amount, tx_type, description, new_balance, related_book_id)
     return new_balance
 
 
 async def reserve_credits(user_id: str, amount: int, description: str,
-                          tx_type: str = "hold", related_book_id: str = None):
+                           tx_type: str = "hold", related_book_id: str = None) -> Optional[int]:
     """Atomically debit `amount`, but only if the balance actually covers it.
     Returns the new balance, or None when the user can't afford it.
 
-    The affordability check lives in the update *filter*, not in a separate
-    read beforehand: concurrent requests would each pass their own
+    The affordability check lives in the update's WHERE clause, not in a
+    separate read beforehand: concurrent requests would each pass their own
     read-then-write check and drive the balance negative. Spending is always
     a reservation taken up front, then reconciled against real usage by
     settle_reservation once the work is done."""
     if amount <= 0:
         return await get_balance(user_id)
-    updated = await db.users.find_one_and_update(
-        {"_id": ObjectId(user_id), "credit_balance": {"$gte": amount}},
-        {"$inc": {"credit_balance": -amount}},
-        return_document=True,
+    pool = await get_pool()
+    new_balance = await pool.fetchval(
+        "update users set credit_balance = credit_balance - $2 where id = $1 and credit_balance >= $2 returning credit_balance",
+        user_id, amount,
     )
-    if updated is None:
+    if new_balance is None:
         return None
-    new_balance = updated.get("credit_balance", 0)
     await _log_transaction(user_id, -amount, tx_type, description, new_balance, related_book_id)
     return new_balance
 
@@ -77,30 +75,30 @@ async def charge_capped(user_id: str, amount: int, tx_type: str, description: st
 
     Used only to settle an overage: the reservation already covered the
     estimate, so a shortfall beyond it is ours to absorb, not the user's to
-    go negative on. Compare-and-swap on the exact balance we read, retried,
-    so a concurrent change can't clobber this or overdraw."""
+    go negative on. One statement: the old balance is read and the new one
+    written under the same row lock, so a concurrent change can't overdraw
+    it — no compare-and-swap retry loop needed."""
     if amount <= 0:
         return await get_balance(user_id)
-    oid = ObjectId(user_id)
-    for _ in range(5):
-        current = await get_balance(user_id)
-        take = min(amount, max(current, 0))
-        if take <= 0:
-            return current
-        updated = await db.users.find_one_and_update(
-            {"_id": oid, "credit_balance": current},
-            {"$inc": {"credit_balance": -take}},
-            return_document=True,
-        )
-        if updated is not None:
-            new_balance = updated.get("credit_balance", 0)
-            await _log_transaction(user_id, -take, tx_type, description, new_balance, related_book_id)
-            return new_balance
-    return await get_balance(user_id)
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        """with old as (select credit_balance from users where id = $1 for update)
+           update users set credit_balance = greatest(users.credit_balance - $2, 0)
+           from old
+           where users.id = $1
+           returning users.credit_balance as new_balance, old.credit_balance as old_balance""",
+        user_id, amount,
+    )
+    if row is None:
+        return 0
+    taken = row["old_balance"] - row["new_balance"]
+    if taken > 0:
+        await _log_transaction(user_id, -taken, tx_type, description, row["new_balance"], related_book_id)
+    return row["new_balance"]
 
 
 async def settle_reservation(user_id: str, reserved: int, actual: int, description: str,
-                             related_book_id: str = None) -> int:
+                              related_book_id: str = None) -> int:
     """Reconcile a hold against what the work actually consumed: refund the
     unused remainder, or collect the overage (capped at the balance)."""
     delta = reserved - actual
@@ -124,18 +122,20 @@ async def ensure_monthly_stipend(user: dict):
     now = datetime.now(timezone.utc)
     if last is None or (now - last) >= timedelta(days=pricing.STIPEND_INTERVAL_DAYS):
         tier_name = pricing.TIERS.get(tier, {}).get("name", tier)
-        await adjust_balance(str(user["_id"]), stipend, "stipend", f"Monthly stipend ({tier_name})")
-        await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_stipend_at": now}})
+        await adjust_balance(str(user["id"]), stipend, "stipend", f"Monthly stipend ({tier_name})")
+        pool = await get_pool()
+        await pool.execute("update users set last_stipend_at = $2 where id = $1", str(user["id"]), now)
         user["last_stipend_at"] = now
 
 
 @router.get("/balance")
 async def balance(user=Depends(get_current_user)):
     await ensure_monthly_stipend(user)
-    fresh = await db.users.find_one({"_id": user["_id"]})
-    tier = fresh.get("tier", "apprentice")
+    pool = await get_pool()
+    fresh = await pool.fetchrow("select * from users where id = $1", str(user["id"]))
+    tier = fresh["tier"]
     return {
-        "balance": fresh.get("credit_balance", 0),
+        "balance": fresh["credit_balance"],
         "tier": tier,
         "tier_name": pricing.TIERS.get(tier, {}).get("name", tier),
         "monthly_stipend": pricing.TIERS.get(tier, {}).get("stipend", 0),
@@ -144,15 +144,19 @@ async def balance(user=Depends(get_current_user)):
 
 @router.get("/transactions")
 async def transactions(user=Depends(get_current_user)):
-    txs = await db.credit_transactions.find({"user_id": str(user["_id"])}).sort("created_at", -1).to_list(50)
+    pool = await get_pool()
+    rows = await pool.fetch(
+        "select * from credit_transactions where user_id = $1 order by created_at desc limit 50",
+        str(user["id"]),
+    )
     return [{
-        "id": str(t["_id"]),
+        "id": str(t["id"]),
         "type": t["type"],
         "amount": t["amount"],
         "balance_after": t["balance_after"],
         "description": t["description"],
         "created_at": t["created_at"].isoformat(),
-    } for t in txs]
+    } for t in rows]
 
 
 @router.get("/styles")

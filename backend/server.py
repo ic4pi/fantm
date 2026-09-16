@@ -19,7 +19,6 @@ config.validate_required_env()
 import db
 import auth
 import books
-import payments
 import credits
 import logos
 
@@ -35,9 +34,11 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(books.router)
-app.include_router(payments.router)
 app.include_router(credits.router)
 app.include_router(logos.router)
+if config.payments_enabled():
+    import payments
+    app.include_router(payments.router)
 
 
 @app.get("/api/health")

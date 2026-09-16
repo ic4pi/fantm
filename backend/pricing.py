@@ -5,7 +5,7 @@ TIERS = {
     "apprentice": {
         "name": "Apprentice",
         "price_usd": 0,
-        "stipend": 3333,
+        "stipend": 5000,
         "lookup_key": None,
         "access": "Limited basic styles",
     },

@@ -12,10 +12,12 @@ REQUIRED_ENV = {
     "DATABASE_URL": "Postgres connection string (Supabase: Project Settings -> Database -> Connection string).",
     "JWT_SECRET": "Secret used to sign access and refresh tokens.",
     "GROQ_API_KEY": "Groq key for the House model (outlines, continuity, free-tier prose).",
-    "STRIPE_SECRET_KEY": "Stripe secret key used to create checkout sessions.",
-    "STRIPE_WEBHOOK_SECRET": "Stripe signing secret used to verify webhook deliveries.",
     "CORS_ORIGINS": "Comma-separated list of allowed browser origins.",
 }
+
+# Payments. Both or neither — a half-set Stripe config used to take checkout
+# money and fail at Stripe. Generation does not need them.
+STRIPE_ENV = ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET")
 
 # Styles routed to these providers need their key, but only if such a style is
 # actually reachable — chat_providers raises a clear error at call time, so
@@ -46,6 +48,18 @@ def validate_required_env():
             "Refusing to start — CORS_ORIGINS is '*' while auth runs on credentialed cookies. "
             "Set it to the explicit browser origin(s), e.g. CORS_ORIGINS=https://fantm.ink"
         )
+
+    stripe_set = [(name, (os.environ.get(name) or "").strip()) for name in STRIPE_ENV]
+    if any(v for _, v in stripe_set) and not all(v for _, v in stripe_set):
+        missing = [name for name, v in stripe_set if not v]
+        raise RuntimeError(
+            "Refusing to start — Stripe keys must be set together or not at all. Missing: "
+            + ", ".join(missing)
+        )
+
+
+def payments_enabled() -> bool:
+    return all((os.environ.get(name) or "").strip() for name in STRIPE_ENV)
 
 
 def get_cors_origins() -> list:

@@ -8,11 +8,15 @@ import pytest
 
 import config
 
-COMPLETE = {
+REQUIRED = {
     "DATABASE_URL": "postgresql://postgres:postgres@localhost/fantm",
     "JWT_SECRET": "s" * 48, "GROQ_API_KEY": "gsk_live",
-    "STRIPE_SECRET_KEY": "sk_live", "STRIPE_WEBHOOK_SECRET": "whsec_live",
     "CORS_ORIGINS": "https://fantm.ink",
+}
+
+COMPLETE = {
+    **REQUIRED,
+    "STRIPE_SECRET_KEY": "sk_live", "STRIPE_WEBHOOK_SECRET": "whsec_live",
 }
 
 
@@ -29,7 +33,7 @@ def test_a_complete_configuration_starts(env):
     config.validate_required_env()
 
 
-@pytest.mark.parametrize("name", sorted(COMPLETE))
+@pytest.mark.parametrize("name", sorted(REQUIRED))
 def test_every_required_variable_is_enforced(env, name):
     env(**{name: ""})
     with pytest.raises(RuntimeError, match="Refusing to start"):
@@ -37,11 +41,23 @@ def test_every_required_variable_is_enforced(env, name):
 
 
 def test_the_error_names_what_is_missing(env):
-    env(STRIPE_SECRET_KEY="", GROQ_API_KEY="")
+    env(GROQ_API_KEY="", DATABASE_URL="")
     with pytest.raises(RuntimeError) as excinfo:
         config.validate_required_env()
-    assert "STRIPE_SECRET_KEY" in str(excinfo.value)
     assert "GROQ_API_KEY" in str(excinfo.value)
+    assert "DATABASE_URL" in str(excinfo.value)
+
+
+def test_stripe_is_optional_so_books_can_generate_without_checkout(env):
+    env(STRIPE_SECRET_KEY="", STRIPE_WEBHOOK_SECRET="")
+    config.validate_required_env()
+    assert config.payments_enabled() is False
+
+
+def test_a_half_set_stripe_config_is_rejected(env):
+    env(STRIPE_WEBHOOK_SECRET="")
+    with pytest.raises(RuntimeError, match="Stripe"):
+        config.validate_required_env()
 
 
 @pytest.mark.parametrize("secret", ["changeme", "secret", "dev", "short", "a" * 31])

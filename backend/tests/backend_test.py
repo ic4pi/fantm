@@ -58,7 +58,7 @@ class TestAuthAndStipend:
         data = fresh_apprentice["data"]
         assert data["tier"] == "apprentice"
         assert data["tier_name"] == "Apprentice"
-        assert data["credit_balance"] == 3333
+        assert data["credit_balance"] == 5000
         assert "premium_active" not in data  # old field removed
         # cookies set
         c = fresh_apprentice["session"].cookies.get_dict()
@@ -69,7 +69,7 @@ class TestAuthAndStipend:
         assert r.status_code == 200
         d = r.json()
         assert d["tier"] == "apprentice"
-        assert d["credit_balance"] >= 3333
+        assert d["credit_balance"] >= 5000
 
     def test_welcome_ledger_transaction_recorded(self, fresh_apprentice):
         r = fresh_apprentice["session"].get(f"{BASE_URL}/api/credits/transactions", timeout=15)
@@ -78,7 +78,7 @@ class TestAuthAndStipend:
         assert len(txs) >= 1
         welcome = txs[-1]  # oldest last (sorted desc, so this is oldest of returned)
         # actually descending; first item is newest. The welcome should exist somewhere
-        assert any(t["type"] == "stipend" and t["amount"] == 3333 for t in txs)
+        assert any(t["type"] == "stipend" and t["amount"] == 5000 for t in txs)
 
     def test_laureate_user_has_expected_tier(self, laureate_session):
         r = laureate_session.get(f"{BASE_URL}/api/auth/me", timeout=15)
@@ -98,8 +98,8 @@ class TestCreditsEndpoints:
         b = r.json()
         assert b["tier"] == "apprentice"
         assert b["tier_name"] == "Apprentice"
-        assert b["monthly_stipend"] == 3333
-        assert b["balance"] >= 3333
+        assert b["monthly_stipend"] == 5000
+        assert b["balance"] >= 5000
 
     def test_tiers_endpoint_returns_three(self):
         r = requests.get(f"{BASE_URL}/api/credits/tiers", timeout=15)
@@ -108,7 +108,7 @@ class TestCreditsEndpoints:
         keys = {t["key"] for t in tiers}
         assert keys == {"apprentice", "wordsmith", "laureate"}
         by_key = {t["key"]: t for t in tiers}
-        assert by_key["apprentice"]["stipend"] == 3333
+        assert by_key["apprentice"]["stipend"] == 5000
         assert by_key["wordsmith"]["stipend"] == 40000
         assert by_key["wordsmith"]["price_usd"] == 9
         assert by_key["laureate"]["stipend"] == 150000
@@ -166,14 +166,14 @@ class TestBookCreationGating:
         assert "higher tier" in (r.json().get("detail") or "").lower() or "style" in (r.json().get("detail") or "").lower()
 
     def test_apprentice_insufficient_credits_returns_402(self, fresh_apprentice):
-        # Short house-style book costs ~5*900*1.0 = 4500 NC > 3333 NC apprentice balance
+        # Long house-style book costs ~12*900*1.0 = 10800 NC > 5000 NC stipend.
         r = fresh_apprentice["session"].post(
             f"{BASE_URL}/api/books",
             json={
                 "book_type": "novel",
-                "prompt": "TEST apprentice cannot afford even a short house-style book.",
+                "prompt": "TEST apprentice cannot afford a long house-style book.",
                 "genre": "test", "tone": "test",
-                "length": "short", "style": "house",
+                "length": "long", "style": "house",
             },
             timeout=20,
         )

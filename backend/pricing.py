@@ -150,25 +150,27 @@ _UNCENSORED_FLOOR = (
 )
 
 WRITER_STYLES.update({
-    "libertine_philosopher": {
-        "name": "The Libertine Philosopher",
+    # The one OpenRouter slot in the uncensored pool — TheDrummer's Anubis,
+    # a 70B Llama 3.3 finetune built for exactly this register.
+    "devils_salon": {
+        "name": "The Devil's Salon",
         "provider": "openrouter", "model": "thedrummer/anubis-70b-v1.1",
         "tier_req": "laureate",
-        "prompt": "Write in a philosophical libertine voice — 18th-century salon wit, characters who argue their desires as principles, sensuous and unflinching prose." + _UNCENSORED_FLOOR,
+        "prompt": "Write in a philosophical-libertine voice — a decadent salon aristocrat who treats desire as a subject worthy of rigorous, elegant argument. Seduction and cruelty are debated as coolly as philosophy; wit stays sharper than the transgression." + _UNCENSORED_FLOOR,
         "uncensored": True,
     },
-    "unbound": {
-        "name": "Unbound",
+    "the_unfiltered": {
+        "name": "The Unfiltered",
         "provider": "venice", "model": "venice-uncensored-1-2",
         "tier_req": "laureate",
-        "prompt": "Write with total creative freedom and no topical restrictions beyond the floor below." + _UNCENSORED_FLOOR,
+        "prompt": "Write with raw, unpolished honesty — no euphemism, no narrative softening, no fade-to-black. Characters act on impulse and desire exactly as they actually would, consequences included, in blunt and direct prose." + _UNCENSORED_FLOOR,
         "uncensored": True,
     },
-    "dolphin_unbound": {
-        "name": "Dolphin Unbound",
+    "feral_tongue": {
+        "name": "Feral Tongue",
         "provider": "venice", "model": "dolphin-mistral-24b-venice-edition",
         "tier_req": "laureate",
-        "prompt": "Write with total creative freedom and no topical restrictions beyond the floor below." + _UNCENSORED_FLOOR,
+        "prompt": "Write with unhinged, untamed energy — chaotic pacing, sharp dark humor, characters who say the unsayable without a beat of hesitation. Voice runs hot and instinctual rather than composed." + _UNCENSORED_FLOOR,
         "uncensored": True,
     },
 })

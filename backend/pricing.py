@@ -132,8 +132,8 @@ WRITER_STYLES = {
         "prompt": "Write in a nihilist, transgressive-fiction voice — spare declarative sentences, an unreliable narrator, anti-consumerist rage, dark irony, sudden visceral violence treated matter-of-factly.",
         "uncensored": False,
     },
-    "hank_chinaski": {
-        "name": "Hank Chinaski",
+    "hank_bukoski": {
+        "name": "Hank Bukoski",
         "provider": "openrouter", "model": "sao10k/l3.1-euryale-70b-v2.2",
         "tier_req": "laureate",
         "prompt": "Write in a dirty-realist confessional voice — blunt first-person candor, working-class squalor, unromantic drinking and desire, dark wit, no sentimentality.",

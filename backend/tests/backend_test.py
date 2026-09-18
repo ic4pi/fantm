@@ -3,7 +3,7 @@ Backend regression tests for fantm.ink (AI Book Generation SaaS).
 
 Iteration 3: NEW Neural Credit (NC) economy.
 - Tiers: apprentice/wordsmith/laureate (replaces free/premium)
-- Styles: house/gothic_romantic/noir_detective/modern_literary/pulp_adventurer + chimera
+- Styles: house/anne_rousseau/raymond_chandley/joan_dedion/edgar_rhys_burrows + chimera
 - Store: 5 items, 3 refill packs
 - NEW endpoints: /api/credits/{balance,transactions,styles,tiers,store,refill-packs}
 - POST /api/payments/checkout now takes {purpose, key, origin_url}
@@ -133,10 +133,10 @@ class TestCreditsEndpoints:
         assert r.status_code == 200
         styles = {s["key"]: s for s in r.json()}
         assert styles["house"]["unlocked"] is True
-        assert styles["gothic_romantic"]["unlocked"] is False
-        assert styles["noir_detective"]["unlocked"] is False
-        assert styles["modern_literary"]["unlocked"] is False
-        assert styles["pulp_adventurer"]["unlocked"] is False
+        assert styles["anne_rousseau"]["unlocked"] is False
+        assert styles["raymond_chandley"]["unlocked"] is False
+        assert styles["joan_dedion"]["unlocked"] is False
+        assert styles["edgar_rhys_burrows"]["unlocked"] is False
         assert styles["chimera"]["unlocked"] is False
         assert styles["chimera"]["multiplier"] == 2.0
 
@@ -158,7 +158,7 @@ class TestBookCreationGating:
                 "book_type": "novel",
                 "prompt": "TEST locked-style attempt as apprentice.",
                 "genre": "test", "tone": "test",
-                "length": "short", "style": "gothic_romantic",
+                "length": "short", "style": "anne_rousseau",
             },
             timeout=20,
         )

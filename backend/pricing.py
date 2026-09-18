@@ -95,43 +95,45 @@ WRITER_STYLES = {
         "prompt": "",
         "uncensored": False,
     },
-    "gothic_romantic": {
-        "name": "The Gothic Romantic",
+    # Each name below is a near-sounding pseudonym for the real author whose
+    # voice the prompt is actually chasing — never the real name itself.
+    "anne_rousseau": {
+        "name": "Anne Rousseau",
         "provider": "openrouter", "model": "sao10k/l3.3-euryale-70b",
         "tier_req": "wordsmith",
         "prompt": "Write in an ornate, atmospheric gothic-romantic voice — lush description, brooding emotion, candlelit dread.",
         "uncensored": False,
     },
-    "noir_detective": {
-        "name": "The Noir Detective",
+    "raymond_chandley": {
+        "name": "Raymond Chandley",
         "provider": "openrouter", "model": "thedrummer/rocinante-12b",
         "tier_req": "wordsmith",
         "prompt": "Write in a hardboiled noir-detective voice — terse punchy sentences, cynical narration, rain-soaked streets.",
         "uncensored": False,
     },
-    "pulp_adventurer": {
-        "name": "The Pulp Adventurer",
+    "edgar_rhys_burrows": {
+        "name": "Edgar Rhys Burrows",
         "provider": "openrouter", "model": "thedrummer/unslopnemo-12b",
         "tier_req": "wordsmith",
         "prompt": "Write in a fast-paced pulp-adventure voice — vivid action, cliffhanger momentum, larger-than-life peril.",
         "uncensored": False,
     },
-    "modern_literary": {
-        "name": "The Modern Literary",
+    "joan_dedion": {
+        "name": "Joan Dedion",
         "provider": "anthropic", "model": "claude-sonnet-5",
         "tier_req": "laureate",
         "prompt": "Write in a spare, introspective literary-fiction voice — precise imagery, restrained emotion, deep interiority.",
         "uncensored": False,
     },
-    "transgressionist": {
-        "name": "The Transgressionist",
+    "chuck_pollanick": {
+        "name": "Chuck Pollanick",
         "provider": "openrouter", "model": "thedrummer/skyfall-36b-v2",
         "tier_req": "laureate",
         "prompt": "Write in a nihilist, transgressive-fiction voice — spare declarative sentences, an unreliable narrator, anti-consumerist rage, dark irony, sudden visceral violence treated matter-of-factly.",
         "uncensored": False,
     },
-    "barfly_confessional": {
-        "name": "The Barfly Confessional",
+    "hank_chinaski": {
+        "name": "Hank Chinaski",
         "provider": "openrouter", "model": "sao10k/l3.1-euryale-70b-v2.2",
         "tier_req": "laureate",
         "prompt": "Write in a dirty-realist confessional voice — blunt first-person candor, working-class squalor, unromantic drinking and desire, dark wit, no sentimentality.",
@@ -151,23 +153,24 @@ _UNCENSORED_FLOOR = (
 
 WRITER_STYLES.update({
     # The one OpenRouter slot in the uncensored pool — TheDrummer's Anubis,
-    # a 70B Llama 3.3 finetune built for exactly this register.
-    "devils_salon": {
-        "name": "The Devil's Salon",
+    # a 70B Llama 3.3 finetune built for exactly this register. Name is a
+    # near-sounding nod to the Marquis de Sade, not the man himself.
+    "marquis_de_sede": {
+        "name": "Marquis de Séde",
         "provider": "openrouter", "model": "thedrummer/anubis-70b-v1.1",
         "tier_req": "laureate",
         "prompt": "Write in a philosophical-libertine voice — a decadent salon aristocrat who treats desire as a subject worthy of rigorous, elegant argument. Seduction and cruelty are debated as coolly as philosophy; wit stays sharper than the transgression." + _UNCENSORED_FLOOR,
         "uncensored": True,
     },
-    "the_unfiltered": {
-        "name": "The Unfiltered",
+    "henry_millar": {
+        "name": "Henry Millar",
         "provider": "venice", "model": "venice-uncensored-1-2",
         "tier_req": "laureate",
         "prompt": "Write with raw, unpolished honesty — no euphemism, no narrative softening, no fade-to-black. Characters act on impulse and desire exactly as they actually would, consequences included, in blunt and direct prose." + _UNCENSORED_FLOOR,
         "uncensored": True,
     },
-    "feral_tongue": {
-        "name": "Feral Tongue",
+    "hunter_thomason": {
+        "name": "Hunter Thomason",
         "provider": "venice", "model": "dolphin-mistral-24b-venice-edition",
         "tier_req": "laureate",
         "prompt": "Write with unhinged, untamed energy — chaotic pacing, sharp dark humor, characters who say the unsayable without a beat of hesitation. Voice runs hot and instinctual rather than composed." + _UNCENSORED_FLOOR,
@@ -234,8 +237,8 @@ def style_multiplier(style: str, style_secondary_a: str = None, style_secondary_
         # Two models actually run in spirit (the prompt blends both voices),
         # so price it off the pricier of the two, plus a fixed blend premium —
         # not a flat constant disconnected from what's actually being blended.
-        a = WRITER_STYLES.get(style_secondary_a or "gothic_romantic", WRITER_STYLES["house"])
-        b = WRITER_STYLES.get(style_secondary_b or "noir_detective", WRITER_STYLES["house"])
+        a = WRITER_STYLES.get(style_secondary_a or "anne_rousseau", WRITER_STYLES["house"])
+        b = WRITER_STYLES.get(style_secondary_b or "raymond_chandley", WRITER_STYLES["house"])
         return round((max(a["multiplier"], b["multiplier"]) + 0.5) * 4) / 4
     return WRITER_STYLES.get(style, WRITER_STYLES["house"])["multiplier"]
 

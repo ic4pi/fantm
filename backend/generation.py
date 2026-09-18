@@ -46,7 +46,7 @@ def _resolve_style_provider(book: dict) -> tuple[str, str]:
     needs one concrete model regardless of how many voices it's blending."""
     style = book.get("style", "house")
     if style == pricing.CHIMERA_KEY:
-        primary_key = book.get("style_secondary_a", "gothic_romantic")
+        primary_key = book.get("style_secondary_a", "anne_rousseau")
         primary = pricing.WRITER_STYLES.get(primary_key, pricing.WRITER_STYLES["house"])
         return primary["provider"], primary["model"]
     entry = pricing.WRITER_STYLES.get(style, pricing.WRITER_STYLES["house"])
@@ -112,8 +112,8 @@ Generate exactly {n_chapters} chapters that form a complete, coherent {label} ar
 def _style_prompt(book: dict) -> str:
     style = book.get("style", "house")
     if style == pricing.CHIMERA_KEY:
-        primary = pricing.WRITER_STYLES.get(book.get("style_secondary_a", "gothic_romantic"), {}).get("prompt", "")
-        secondary = pricing.WRITER_STYLES.get(book.get("style_secondary_b", "noir_detective"), {}).get("prompt", "")
+        primary = pricing.WRITER_STYLES.get(book.get("style_secondary_a", "anne_rousseau"), {}).get("prompt", "")
+        secondary = pricing.WRITER_STYLES.get(book.get("style_secondary_b", "raymond_chandley"), {}).get("prompt", "")
         return f"Blend two voices (Chimera Blend): (1) {primary} (2) {secondary} Fuse both into one distinctive hybrid voice."
     return pricing.WRITER_STYLES.get(style, pricing.WRITER_STYLES["house"]).get("prompt", "")
 

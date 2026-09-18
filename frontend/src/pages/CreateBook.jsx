@@ -31,8 +31,8 @@ export default function CreateBook() {
   const [tone, setTone] = useState("");
   const [length, setLength] = useState("short");
   const [style, setStyle] = useState("house");
-  const [chimeraA, setChimeraA] = useState("gothic_romantic");
-  const [chimeraB, setChimeraB] = useState("noir_detective");
+  const [chimeraA, setChimeraA] = useState("anne_rousseau");
+  const [chimeraB, setChimeraB] = useState("raymond_chandley");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [insufficient, setInsufficient] = useState(null);

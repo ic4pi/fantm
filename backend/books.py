@@ -19,11 +19,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/books")
 
 
+class CharacterSeedIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    role: str = Field("", max_length=100)
+    description: str = Field("", max_length=500)
+
+
 class CreateBookIn(BaseModel):
     book_type: str = Field(pattern="^(novel|memoir|biography)$")
-    prompt: str = Field(min_length=10, max_length=2000)
+    prompt: str = Field(min_length=10, max_length=4000)
     genre: str = ""
     tone: str = ""
+    setting: str = Field("", max_length=2000)
+    backstory: str = Field("", max_length=3000)
+    characters: list[CharacterSeedIn] = Field(default_factory=list, max_length=12)
     length: str = Field(pattern="^(short|medium|long)$")
     style: str = "house"
     style_secondary_a: Optional[str] = None
@@ -120,17 +129,24 @@ async def create_book(body: CreateBookIn, user=Depends(get_current_user)):
     if balance < estimated_cost:
         raise HTTPException(402, f"Not enough Neural Credits. This book needs ~{estimated_cost} NC, you have {balance} NC. Visit the Store to top up.")
 
+    composed_prompt = body.prompt
+    if body.setting.strip():
+        composed_prompt += f"\n\nSetting: {body.setting.strip()}"
+    if body.backstory.strip():
+        composed_prompt += f"\n\nBackstory: {body.backstory.strip()}"
+    seed_characters = [c.model_dump() for c in body.characters]
+
     pool = await get_pool()
     now = datetime.now(timezone.utc)
     row = await pool.fetchrow(
         """insert into books (
              user_id, title, book_type, genre, tone, length, style,
-             style_secondary_a, style_secondary_b, prompt, total_chapters,
+             style_secondary_a, style_secondary_b, prompt, characters, total_chapters,
              reserved_nc, settled, created_at, updated_at
-           ) values ($1,'Generating...',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,false,$12,$12)
+           ) values ($1,'Generating...',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,false,$13,$13)
            returning *""",
         str(user["id"]), body.book_type, body.genre, body.tone, body.length, body.style,
-        body.style_secondary_a, body.style_secondary_b, body.prompt, total_chapters,
+        body.style_secondary_a, body.style_secondary_b, composed_prompt, seed_characters, total_chapters,
         estimated_cost, now,
     )
     book_doc = dict(row)

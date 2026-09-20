@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api, { formatApiErrorDetail } from "@/lib/api";
@@ -19,23 +19,46 @@ const LENGTHS = [
 
 const WORDS_PER_CHAPTER = 900;
 
+// A book premise can take a while to dictate. Nothing else on this page
+// persists it, so a stray reload/backgrounded-tab reset used to wipe
+// whatever the user had typed with no way back — draft it to localStorage
+// as they go and restore it on mount.
+const DRAFT_KEY = "fantm:create-book-draft";
+
+function loadDraft() {
+  try {
+    return JSON.parse(localStorage.getItem(DRAFT_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
 export default function CreateBook() {
   const navigate = useNavigate();
+  const draft = useMemo(loadDraft, []);
 
   const { data: styles } = useQuery({ queryKey: ["credits-styles"], queryFn: async () => (await api.get("/credits/styles")).data });
   const { data: balanceData } = useQuery({ queryKey: ["credits-balance"], queryFn: async () => (await api.get("/credits/balance")).data });
 
-  const [bookType, setBookType] = useState("novel");
-  const [prompt, setPrompt] = useState("");
-  const [genre, setGenre] = useState("");
-  const [tone, setTone] = useState("");
-  const [length, setLength] = useState("short");
-  const [style, setStyle] = useState("house");
-  const [chimeraA, setChimeraA] = useState("anne_rousseau");
-  const [chimeraB, setChimeraB] = useState("raymond_chandley");
+  const [bookType, setBookType] = useState(draft.bookType ?? "novel");
+  const [prompt, setPrompt] = useState(draft.prompt ?? "");
+  const [genre, setGenre] = useState(draft.genre ?? "");
+  const [tone, setTone] = useState(draft.tone ?? "");
+  const [length, setLength] = useState(draft.length ?? "short");
+  const [style, setStyle] = useState(draft.style ?? "house");
+  const [chimeraA, setChimeraA] = useState(draft.chimeraA ?? "anne_rousseau");
+  const [chimeraB, setChimeraB] = useState(draft.chimeraB ?? "raymond_chandley");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [insufficient, setInsufficient] = useState(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ bookType, prompt, genre, tone, length, style, chimeraA, chimeraB }));
+    } catch {
+      // best-effort — private browsing / storage full shouldn't block writing
+    }
+  }, [bookType, prompt, genre, tone, length, style, chimeraA, chimeraB]);
 
   const selectedStyle = styles?.find((s) => s.key === style);
   const multiplier = useMemo(() => {
@@ -68,6 +91,11 @@ export default function CreateBook() {
         payload.style_secondary_b = chimeraB;
       }
       const { data } = await api.post("/books", payload);
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // ignore
+      }
       navigate(`/books/${data.id}/generating`);
     } catch (e) {
       const detail = formatApiErrorDetail(e.response?.data?.detail) || e.message;
@@ -173,6 +201,11 @@ export default function CreateBook() {
                 <div className="flex items-center gap-1.5">
                   {!s.unlocked && <Lock className="w-3 h-3" />}
                   {s.name}
+                  {s.uncensored && (
+                    <span className="text-[9px] px-1.5 py-0.5 border border-destructive/50 text-destructive uppercase tracking-wide">
+                      uncensored
+                    </span>
+                  )}
                 </div>
                 <div className="text-[10px] opacity-70">
                   {s.key === "chimera" ? `${s.multiplier_min}–${s.multiplier_max}x NC/word (depends on blend)` : `${s.multiplier}x NC/word`}
@@ -190,6 +223,9 @@ export default function CreateBook() {
                 {styles?.filter((s) => s.key !== "chimera" && s.key !== "house").map((s) => <option key={s.key} value={s.key}>{s.name}</option>)}
               </select>
             </div>
+          )}
+          {style === "chimera" && (styles?.find((s) => s.key === chimeraA)?.uncensored || styles?.find((s) => s.key === chimeraB)?.uncensored) && (
+            <p className="text-[10px] text-destructive mt-2 uppercase tracking-wide">this blend includes an uncensored voice</p>
           )}
         </div>
 

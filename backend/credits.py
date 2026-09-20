@@ -164,7 +164,7 @@ async def styles(user=Depends(get_current_user)):
     tier = user.get("tier", "apprentice")
     allowed = set(pricing.allowed_styles_for_tier(tier))
     out = [
-        {"key": k, "name": v["name"], "multiplier": v["multiplier"], "tier_req": v["tier_req"], "unlocked": k in allowed}
+        {"key": k, "name": v["name"], "multiplier": v["multiplier"], "tier_req": v["tier_req"], "unlocked": k in allowed, "uncensored": v["uncensored"]}
         for k, v in pricing.WRITER_STYLES.items()
     ]
     chimera_lo, chimera_hi = pricing.chimera_multiplier_range()

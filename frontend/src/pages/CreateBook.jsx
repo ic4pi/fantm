@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api, { formatApiErrorDetail } from "@/lib/api";
@@ -19,23 +19,66 @@ const LENGTHS = [
 
 const WORDS_PER_CHAPTER = 900;
 
+// A book premise can take a while to dictate. Nothing else on this page
+// persists it, so a stray reload/backgrounded-tab reset used to wipe
+// whatever the user had typed with no way back — draft it to localStorage
+// as they go and restore it on mount.
+const DRAFT_KEY = "fantm:create-book-draft";
+
+function loadDraft() {
+  try {
+    return JSON.parse(localStorage.getItem(DRAFT_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
 export default function CreateBook() {
   const navigate = useNavigate();
+  const draft = useMemo(loadDraft, []);
 
   const { data: styles } = useQuery({ queryKey: ["credits-styles"], queryFn: async () => (await api.get("/credits/styles")).data });
   const { data: balanceData } = useQuery({ queryKey: ["credits-balance"], queryFn: async () => (await api.get("/credits/balance")).data });
 
-  const [bookType, setBookType] = useState("novel");
-  const [prompt, setPrompt] = useState("");
-  const [genre, setGenre] = useState("");
-  const [tone, setTone] = useState("");
-  const [length, setLength] = useState("short");
-  const [style, setStyle] = useState("house");
-  const [chimeraA, setChimeraA] = useState("anne_rousseau");
-  const [chimeraB, setChimeraB] = useState("raymond_chandley");
+  const [bookType, setBookType] = useState(draft.bookType ?? "novel");
+  const [prompt, setPrompt] = useState(draft.prompt ?? "");
+  const [setting, setSetting] = useState(draft.setting ?? "");
+  const [backstory, setBackstory] = useState(draft.backstory ?? "");
+  const [characters, setCharacters] = useState(draft.characters ?? []);
+  const [charName, setCharName] = useState("");
+  const [charRole, setCharRole] = useState("");
+  const [charDesc, setCharDesc] = useState("");
+  const [genre, setGenre] = useState(draft.genre ?? "");
+  const [tone, setTone] = useState(draft.tone ?? "");
+  const [length, setLength] = useState(draft.length ?? "short");
+  const [style, setStyle] = useState(draft.style ?? "house");
+  const [chimeraA, setChimeraA] = useState(draft.chimeraA ?? "anne_rousseau");
+  const [chimeraB, setChimeraB] = useState(draft.chimeraB ?? "raymond_chandley");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [insufficient, setInsufficient] = useState(null);
+
+  const MAX_CHARACTERS = 12;
+
+  const addCharacter = () => {
+    if (!charName.trim() || characters.length >= MAX_CHARACTERS) return;
+    setCharacters((c) => [...c, { name: charName.trim(), role: charRole.trim(), description: charDesc.trim() }]);
+    setCharName("");
+    setCharRole("");
+    setCharDesc("");
+  };
+  const removeCharacter = (idx) => setCharacters((c) => c.filter((_, i) => i !== idx));
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ bookType, prompt, setting, backstory, characters, genre, tone, length, style, chimeraA, chimeraB })
+      );
+    } catch {
+      // best-effort — private browsing / storage full shouldn't block writing
+    }
+  }, [bookType, prompt, setting, backstory, characters, genre, tone, length, style, chimeraA, chimeraB]);
 
   const selectedStyle = styles?.find((s) => s.key === style);
   const multiplier = useMemo(() => {
@@ -62,12 +105,17 @@ export default function CreateBook() {
     setLoading(true);
     setError("");
     try {
-      const payload = { book_type: bookType, prompt, genre, tone, length, style };
+      const payload = { book_type: bookType, prompt, setting, backstory, characters, genre, tone, length, style };
       if (style === "chimera") {
         payload.style_secondary_a = chimeraA;
         payload.style_secondary_b = chimeraB;
       }
       const { data } = await api.post("/books", payload);
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // ignore
+      }
       navigate(`/books/${data.id}/generating`);
     } catch (e) {
       const detail = formatApiErrorDetail(e.response?.data?.detail) || e.message;
@@ -104,10 +152,14 @@ export default function CreateBook() {
         </div>
 
         <div>
-          <label className="block text-muted-foreground mb-2">prompt / premise</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-muted-foreground">prompt / premise</label>
+            <span className="text-[10px] text-muted-foreground">{prompt.length}/4000</span>
+          </div>
           <textarea
             required
             minLength={10}
+            maxLength={4000}
             rows={5}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -115,6 +167,92 @@ export default function CreateBook() {
             className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none"
             data-testid="create-book-prompt-input"
           />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-muted-foreground">setting <span className="opacity-60">(optional)</span></label>
+            <span className="text-[10px] text-muted-foreground">{setting.length}/2000</span>
+          </div>
+          <textarea
+            rows={3}
+            maxLength={2000}
+            value={setting}
+            onChange={(e) => setSetting(e.target.value)}
+            placeholder="A fog-locked archipelago in 1920s Maine, decades before radio reached the outer islands..."
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none"
+            data-testid="create-book-setting-input"
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-muted-foreground">backstory / history <span className="opacity-60">(optional)</span></label>
+            <span className="text-[10px] text-muted-foreground">{backstory.length}/3000</span>
+          </div>
+          <textarea
+            rows={3}
+            maxLength={3000}
+            value={backstory}
+            onChange={(e) => setBackstory(e.target.value)}
+            placeholder="The lighthouse has changed keepers seven times in forty years. None have stayed past a year..."
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none"
+            data-testid="create-book-backstory-input"
+          />
+        </div>
+
+        <div>
+          <label className="block text-muted-foreground mb-2">characters <span className="opacity-60">(optional — up to {MAX_CHARACTERS})</span></label>
+          {characters.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {characters.map((c, i) => (
+                <div key={i} className="flex items-start justify-between gap-3 border border-border px-3 py-2" data-testid={`character-row-${i}`}>
+                  <div>
+                    <span className="text-primary">{c.name}</span>
+                    {c.role && <span className="text-muted-foreground"> — {c.role}</span>}
+                    {c.description && <div className="text-[11px] text-muted-foreground opacity-80">{c.description}</div>}
+                  </div>
+                  <button type="button" onClick={() => removeCharacter(i)} className="text-destructive text-xs shrink-0" data-testid={`character-remove-${i}`}>
+                    remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {characters.length < MAX_CHARACTERS && (
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                value={charName}
+                onChange={(e) => setCharName(e.target.value)}
+                placeholder="name"
+                className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2"
+                data-testid="character-name-input"
+              />
+              <input
+                value={charRole}
+                onChange={(e) => setCharRole(e.target.value)}
+                placeholder="role (protagonist, rival...)"
+                className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2"
+                data-testid="character-role-input"
+              />
+              <input
+                value={charDesc}
+                onChange={(e) => setCharDesc(e.target.value)}
+                placeholder="short description"
+                className="col-span-2 w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2"
+                data-testid="character-description-input"
+              />
+              <button
+                type="button"
+                onClick={addCharacter}
+                disabled={!charName.trim()}
+                className="col-span-2 py-2 border border-primary/50 text-primary hover:border-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                data-testid="character-add-button"
+              >
+                + add character
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -173,6 +311,11 @@ export default function CreateBook() {
                 <div className="flex items-center gap-1.5">
                   {!s.unlocked && <Lock className="w-3 h-3" />}
                   {s.name}
+                  {s.uncensored && (
+                    <span className="text-[9px] px-1.5 py-0.5 border border-destructive/50 text-destructive uppercase tracking-wide">
+                      uncensored
+                    </span>
+                  )}
                 </div>
                 <div className="text-[10px] opacity-70">
                   {s.key === "chimera" ? `${s.multiplier_min}–${s.multiplier_max}x NC/word (depends on blend)` : `${s.multiplier}x NC/word`}
@@ -190,6 +333,9 @@ export default function CreateBook() {
                 {styles?.filter((s) => s.key !== "chimera" && s.key !== "house").map((s) => <option key={s.key} value={s.key}>{s.name}</option>)}
               </select>
             </div>
+          )}
+          {style === "chimera" && (styles?.find((s) => s.key === chimeraA)?.uncensored || styles?.find((s) => s.key === chimeraB)?.uncensored) && (
+            <p className="text-[10px] text-destructive mt-2 uppercase tracking-wide">this blend includes an uncensored voice</p>
           )}
         </div>
 

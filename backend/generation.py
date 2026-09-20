@@ -92,9 +92,20 @@ def generate_outline(book: dict) -> dict:
         f"You are a master {label} writer and story architect. "
         "Design a coherent long-form book outline. Respond ONLY with valid raw JSON, no markdown fences, no commentary."
     )
+    seed_characters = book.get("characters") or []
+    characters_block = ""
+    if seed_characters:
+        listed = "\n".join(
+            f"- {c.get('name')} ({c.get('role', '')}): {c.get('description', '')}" for c in seed_characters
+        )
+        characters_block = (
+            "\nThe author has already defined these characters — use them exactly as given "
+            "(do not rename, contradict, or replace them; you may add supporting characters as needed). "
+            f'Your JSON response\'s "characters" list must include all of them verbatim:\n{listed}\n'
+        )
     user = f"""Create a book outline for a {book['book_type']} with genre "{book['genre']}" and tone "{book['tone']}".
 User's prompt/premise: {book['prompt']}
-
+{characters_block}
 Return JSON with this exact shape:
 {{
   "title": "book title",

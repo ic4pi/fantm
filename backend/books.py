@@ -43,6 +43,12 @@ class UpdateChapterIn(BaseModel):
     content: str
 
 
+class UpdateBibleIn(BaseModel):
+    premise: Optional[str] = Field(None, max_length=4000)
+    characters: Optional[list[CharacterSeedIn]] = Field(None, max_length=30)
+    plot_threads: Optional[list[str]] = Field(None, max_length=30)
+
+
 def _iso(v):
     return v.isoformat() if isinstance(v, datetime) else v
 

@@ -254,6 +254,18 @@ async def run_generation(book_id: str):
             chapter_id = chapter_row["id"]
             await pool.execute("update books set current_chapter=$2, updated_at=$3 where id=$1", book_id, idx + 1, datetime.now(timezone.utc))
 
+            # Re-read characters/plot_threads/premise right before writing this
+            # chapter — not just carrying the in-memory book_doc forward — so a
+            # Story Bible edit made mid-generation actually reaches the next
+            # not-yet-written chapter instead of being silently clobbered by
+            # the continuity update below (which otherwise writes back
+            # whatever book_doc already held before the user's edit).
+            fresh = await pool.fetchrow("select characters, plot_threads, premise from books where id=$1", book_id)
+            if fresh:
+                book_doc["characters"] = fresh["characters"]
+                book_doc["plot_threads"] = fresh["plot_threads"]
+                book_doc["premise"] = fresh["premise"]
+
             content = await asyncio.to_thread(
                 generate_chapter_content, book_doc, brief, idx, len(chapters_brief), chapters_brief[idx + 1:]
             )

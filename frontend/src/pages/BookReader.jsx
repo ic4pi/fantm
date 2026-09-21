@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { InsufficientCreditsModal } from "@/components/InsufficientCreditsModal";
 import BookTables from "@/components/BookTables";
+import StoryBible from "@/components/StoryBible";
 import { PenLine, Save, FileDown, ImageOff, Lock, Zap } from "lucide-react";
 
 const ILLUSTRATION_UNLOCK_COST = 2000;
@@ -210,6 +211,7 @@ export default function BookReader() {
         />
       )}
     </div>
+    <StoryBible bookId={id} book={book} onSaved={refetchBook} />
     <BookTables bookId={id} />
     </>
   );

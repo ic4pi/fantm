@@ -223,6 +223,26 @@ async def get_book(book_id: str, user=Depends(get_current_user)):
     return serialize_book(await _get_owned_book(book_id, user))
 
 
+@router.patch("/{book_id}/bible")
+async def update_bible(book_id: str, body: UpdateBibleIn, user=Depends(get_current_user)):
+    """Edit the characters/plot-threads/premise the AI is tracking. Only
+    touches fields actually sent — an untouched field keeps whatever
+    generation last wrote, so this can be used mid-generation without
+    clobbering continuity the author didn't mean to change. The next
+    not-yet-written chapter picks these up (run_generation re-reads them
+    fresh before each chapter for exactly this reason)."""
+    book = await _get_owned_book(book_id, user)
+    pool = await get_pool()
+    premise = body.premise if body.premise is not None else book.get("premise", "")
+    characters = [c.model_dump() for c in body.characters] if body.characters is not None else book.get("characters", [])
+    plot_threads = body.plot_threads if body.plot_threads is not None else book.get("plot_threads", [])
+    row = await pool.fetchrow(
+        "update books set premise=$2, characters=$3, plot_threads=$4, updated_at=$5 where id=$1 returning *",
+        book["id"], premise, characters, plot_threads, datetime.now(timezone.utc),
+    )
+    return serialize_book(dict(row))
+
+
 @router.get("/{book_id}/chapters")
 async def list_chapters(book_id: str, user=Depends(get_current_user)):
     book = await _get_owned_book(book_id, user)

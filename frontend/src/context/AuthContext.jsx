@@ -41,6 +41,24 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const forgotPassword = async (email) => {
+    try {
+      await api.post("/auth/forgot-password", { email });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
+    }
+  };
+
+  const resetPassword = async (token, password) => {
+    try {
+      await api.post("/auth/reset-password", { token, password });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
+    }
+  };
+
   const logout = async () => {
     try {
       await api.post("/auth/logout");
@@ -51,7 +69,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, forgotPassword, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );

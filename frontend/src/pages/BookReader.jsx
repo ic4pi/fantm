@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { InsufficientCreditsModal } from "@/components/InsufficientCreditsModal";
+import BookTables from "@/components/BookTables";
 import { PenLine, Save, FileDown, ImageOff, Lock, Zap } from "lucide-react";
 
 const ILLUSTRATION_UNLOCK_COST = 2000;
@@ -89,6 +90,7 @@ export default function BookReader() {
   }
 
   return (
+    <>
     <div className="flex flex-col lg:flex-row max-w-6xl mx-auto px-6 py-12 gap-10" data-testid="book-reader-page">
       <aside className="lg:w-64 shrink-0">
         <p className="font-mono text-accent text-xs tracking-widest mb-3">// CONTENTS</p>
@@ -208,5 +210,7 @@ export default function BookReader() {
         />
       )}
     </div>
+    <BookTables bookId={id} />
+    </>
   );
 }

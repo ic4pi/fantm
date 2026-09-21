@@ -1,3 +1,6 @@
+import hashlib
+import logging
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -6,10 +9,13 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 
+import config
 import pricing
 from credits import ensure_monthly_stipend
 from db import get_pool
 from deps import JWT_ALGORITHM, get_current_user, get_jwt_secret
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth")
 
@@ -17,6 +23,7 @@ ACCESS_EXPIRE_MIN = 60 * 24
 REFRESH_EXPIRE_DAYS = 7
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
+RESET_TOKEN_EXPIRE_MIN = 30
 
 
 def hash_password(password: str) -> str:
@@ -76,6 +83,19 @@ class LoginIn(BaseModel):
     password: str
 
 
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordIn(BaseModel):
+    token: str
+    password: str = Field(min_length=6)
+
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 @router.post("/register")
 async def register(body: RegisterIn, response: Response):
     email = body.email.lower()
@@ -126,6 +146,45 @@ async def login(body: LoginIn, response: Response, request: Request):
     await ensure_monthly_stipend(user)
     set_auth_cookies(response, str(user["id"]), email)
     return serialize_user(user)
+
+
+@router.post("/forgot-password")
+async def forgot_password(body: ForgotPasswordIn):
+    email = body.email.lower()
+    pool = await get_pool()
+    user_row = await pool.fetchrow("select id from users where email = $1", email)
+    # Same response whether or not the email is registered — a different one
+    # would let a caller enumerate which emails have accounts.
+    if user_row:
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRE_MIN)
+        await pool.execute(
+            "insert into password_resets (user_id, token_hash, expires_at) values ($1, $2, $3)",
+            str(user_row["id"]), _hash_reset_token(token), expires_at,
+        )
+        origins = config.get_cors_origins()
+        base_url = origins[0] if origins else ""
+        reset_link = f"{base_url}/reset-password?token={token}"
+        # No email provider is wired up yet, so this can't actually be
+        # emailed — log it so it's at least retrievable (Render logs) instead
+        # of the request silently going nowhere.
+        logger.warning("Password reset requested for %s — link (expires in %d min): %s", email, RESET_TOKEN_EXPIRE_MIN, reset_link)
+    return {"ok": True}
+
+
+@router.post("/reset-password")
+async def reset_password(body: ResetPasswordIn):
+    pool = await get_pool()
+    token_hash = _hash_reset_token(body.token)
+    row = await pool.fetchrow(
+        "select * from password_resets where token_hash = $1 and used = false",
+        token_hash,
+    )
+    if not row or row["expires_at"].replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise HTTPException(400, "This reset link is invalid or has expired.")
+    await pool.execute("update users set password_hash = $2 where id = $1", row["user_id"], hash_password(body.password))
+    await pool.execute("update password_resets set used = true where id = $1", row["id"])
+    return {"ok": True}
 
 
 @router.post("/logout")

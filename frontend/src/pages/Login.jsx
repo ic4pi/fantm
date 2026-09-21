@@ -58,7 +58,10 @@ export default function Login() {
             {loading ? "authenticating..." : "enter"}
           </button>
         </form>
-        <p className="font-mono text-xs text-muted-foreground mt-6">
+        <p className="font-mono text-xs text-muted-foreground mt-4">
+          <Link to="/forgot-password" className="text-primary" data-testid="login-forgot-password-link">Forgot password?</Link>
+        </p>
+        <p className="font-mono text-xs text-muted-foreground mt-2">
           No account? <Link to="/register" className="text-primary" data-testid="login-register-link">Sign up</Link>
         </p>
       </div>

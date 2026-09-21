@@ -33,6 +33,8 @@ class CreateBookIn(BaseModel):
     setting: str = Field("", max_length=2000)
     backstory: str = Field("", max_length=3000)
     chapter_outline: str = Field("", max_length=6000)
+    timeline: str = Field("", max_length=6000)
+    world_rules: list[str] = Field(default_factory=list, max_length=30)
     characters: list[CharacterSeedIn] = Field(default_factory=list, max_length=12)
     length: str = Field(pattern="^(short|medium|long)$")
     style: str = "house"
@@ -71,6 +73,7 @@ class UpdateBibleIn(BaseModel):
     premise: Optional[str] = Field(None, max_length=4000)
     characters: Optional[list[CharacterSeedIn]] = Field(None, max_length=30)
     plot_threads: Optional[list[str]] = Field(None, max_length=30)
+    world_rules: Optional[list[str]] = Field(None, max_length=30)
 
 
 def _iso(v):
@@ -92,6 +95,7 @@ def serialize_book(b: dict) -> dict:
         "premise": b.get("premise", ""),
         "characters": b.get("characters", []),
         "plot_threads": b.get("plot_threads", []),
+        "world_rules": b.get("world_rules", []),
         "outline": b.get("outline", []),
         "total_chapters": b.get("total_chapters", 0),
         "current_chapter": b.get("current_chapter", 0),
@@ -171,6 +175,13 @@ async def create_book(body: CreateBookIn, user=Depends(get_current_user)):
             "or a different chapter count than what's listed here):\n"
             f"{body.chapter_outline.strip()}"
         )
+    if body.timeline.strip():
+        composed_prompt += (
+            "\n\nAuthor-provided timeline of events — a simpler alternative to a full "
+            "chapter outline. Sequence the chapters to follow this chronology "
+            "(still fitting the requested chapter count):\n"
+            f"{body.timeline.strip()}"
+        )
     seed_characters = [c.model_dump() for c in body.characters]
 
     pool = await get_pool()
@@ -178,12 +189,12 @@ async def create_book(body: CreateBookIn, user=Depends(get_current_user)):
     row = await pool.fetchrow(
         """insert into books (
              user_id, title, book_type, genre, tone, length, style,
-             style_secondary_a, style_secondary_b, prompt, characters, total_chapters,
+             style_secondary_a, style_secondary_b, prompt, characters, world_rules, total_chapters,
              reserved_nc, settled, created_at, updated_at
-           ) values ($1,'Generating...',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,false,$13,$13)
+           ) values ($1,'Generating...',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,false,$14,$14)
            returning *""",
         str(user["id"]), body.book_type, body.genre, body.tone, body.length, body.style,
-        body.style_secondary_a, body.style_secondary_b, composed_prompt, seed_characters, total_chapters,
+        body.style_secondary_a, body.style_secondary_b, composed_prompt, seed_characters, body.world_rules, total_chapters,
         estimated_cost, now,
     )
     book_doc = dict(row)
@@ -236,9 +247,10 @@ async def update_bible(book_id: str, body: UpdateBibleIn, user=Depends(get_curre
     premise = body.premise if body.premise is not None else book.get("premise", "")
     characters = [c.model_dump() for c in body.characters] if body.characters is not None else book.get("characters", [])
     plot_threads = body.plot_threads if body.plot_threads is not None else book.get("plot_threads", [])
+    world_rules = body.world_rules if body.world_rules is not None else book.get("world_rules", [])
     row = await pool.fetchrow(
-        "update books set premise=$2, characters=$3, plot_threads=$4, updated_at=$5 where id=$1 returning *",
-        book["id"], premise, characters, plot_threads, datetime.now(timezone.utc),
+        "update books set premise=$2, characters=$3, plot_threads=$4, world_rules=$5, updated_at=$6 where id=$1 returning *",
+        book["id"], premise, characters, plot_threads, world_rules, datetime.now(timezone.utc),
     )
     return serialize_book(dict(row))
 

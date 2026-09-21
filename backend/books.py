@@ -32,6 +32,7 @@ class CreateBookIn(BaseModel):
     tone: str = ""
     setting: str = Field("", max_length=2000)
     backstory: str = Field("", max_length=3000)
+    chapter_outline: str = Field("", max_length=6000)
     characters: list[CharacterSeedIn] = Field(default_factory=list, max_length=12)
     length: str = Field(pattern="^(short|medium|long)$")
     style: str = "house"
@@ -41,6 +42,29 @@ class CreateBookIn(BaseModel):
 
 class UpdateChapterIn(BaseModel):
     content: str
+
+
+class TableIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    columns: list[str] = Field(default_factory=list, max_length=20)
+
+
+class TableUpdateIn(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    columns: Optional[list[str]] = Field(None, max_length=20)
+    rows: Optional[list[dict]] = Field(None, max_length=500)
+
+
+def serialize_table(t: dict) -> dict:
+    return {
+        "id": str(t["id"]),
+        "book_id": str(t["book_id"]),
+        "name": t["name"],
+        "columns": t.get("columns", []),
+        "rows": t.get("rows", []),
+        "created_at": _iso(t.get("created_at")),
+        "updated_at": _iso(t.get("updated_at")),
+    }
 
 
 class UpdateBibleIn(BaseModel):
@@ -140,6 +164,13 @@ async def create_book(body: CreateBookIn, user=Depends(get_current_user)):
         composed_prompt += f"\n\nSetting: {body.setting.strip()}"
     if body.backstory.strip():
         composed_prompt += f"\n\nBackstory: {body.backstory.strip()}"
+    if body.chapter_outline.strip():
+        composed_prompt += (
+            "\n\nAuthor-provided chapter outline — use this exact chapter breakdown "
+            "(expand each entry into a full chapter; do not invent a different structure "
+            "or a different chapter count than what's listed here):\n"
+            f"{body.chapter_outline.strip()}"
+        )
     seed_characters = [c.model_dump() for c in body.characters]
 
     pool = await get_pool()
@@ -302,3 +333,61 @@ async def export_pdf(book_id: str, user=Depends(get_current_user)):
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={safe_title}.pdf"},
     )
+
+
+MAX_TABLES_PER_BOOK = 20
+
+
+@router.get("/{book_id}/tables")
+async def list_tables(book_id: str, user=Depends(get_current_user)):
+    book = await _get_owned_book(book_id, user)
+    pool = await get_pool()
+    rows = await pool.fetch("select * from book_tables where book_id = $1 order by created_at asc", book["id"])
+    return [serialize_table(dict(r)) for r in rows]
+
+
+@router.post("/{book_id}/tables")
+async def create_table(book_id: str, body: TableIn, user=Depends(get_current_user)):
+    book = await _get_owned_book(book_id, user)
+    pool = await get_pool()
+    existing_count = await pool.fetchval("select count(*) from book_tables where book_id = $1", book["id"])
+    if existing_count >= MAX_TABLES_PER_BOOK:
+        raise HTTPException(400, f"This book already has the maximum of {MAX_TABLES_PER_BOOK} tables.")
+    now = datetime.now(timezone.utc)
+    row = await pool.fetchrow(
+        """insert into book_tables (book_id, name, columns, rows, created_at, updated_at)
+           values ($1, $2, $3, '[]'::jsonb, $4, $4) returning *""",
+        book["id"], body.name, body.columns, now,
+    )
+    return serialize_table(dict(row))
+
+
+@router.patch("/{book_id}/tables/{table_id}")
+async def update_table(book_id: str, table_id: str, body: TableUpdateIn, user=Depends(get_current_user)):
+    book = await _get_owned_book(book_id, user)
+    pool = await get_pool()
+    existing = await pool.fetchrow(
+        "select * from book_tables where id = $1 and book_id = $2",
+        to_uuid(table_id, "Table not found"), book["id"],
+    )
+    if not existing:
+        raise HTTPException(404, "Table not found")
+    name = body.name if body.name is not None else existing["name"]
+    columns = body.columns if body.columns is not None else existing["columns"]
+    rows_val = body.rows if body.rows is not None else existing["rows"]
+    row = await pool.fetchrow(
+        "update book_tables set name=$2, columns=$3, rows=$4, updated_at=$5 where id=$1 returning *",
+        existing["id"], name, columns, rows_val, datetime.now(timezone.utc),
+    )
+    return serialize_table(dict(row))
+
+
+@router.delete("/{book_id}/tables/{table_id}")
+async def delete_table(book_id: str, table_id: str, user=Depends(get_current_user)):
+    book = await _get_owned_book(book_id, user)
+    pool = await get_pool()
+    await pool.execute(
+        "delete from book_tables where id = $1 and book_id = $2",
+        to_uuid(table_id, "Table not found"), book["id"],
+    )
+    return {"ok": True}

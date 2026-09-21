@@ -115,7 +115,12 @@ Return JSON with this exact shape:
   "chapters": [{{"title": "...", "summary": "1-2 sentence summary of what happens"}}]
 }}
 
-Generate exactly {n_chapters} chapters that form a complete, coherent {label} arc with a beginning, middle and satisfying ending."""
+{
+    "Follow the author-provided chapter outline above for how many chapters there are and "
+    "what happens in each one — do not default to a different chapter count."
+    if "Author-provided chapter outline" in book.get("prompt", "")
+    else f"Generate exactly {n_chapters} chapters that form a complete, coherent {label} arc with a beginning, middle and satisfying ending."
+}"""
     raw = _chat([{"role": "system", "content": system}, {"role": "user", "content": user}], max_tokens=3000, temperature=0.9)
     return _parse_json_loose(raw)
 
@@ -129,9 +134,31 @@ def _style_prompt(book: dict) -> str:
     return pricing.WRITER_STYLES.get(style, pricing.WRITER_STYLES["house"]).get("prompt", "")
 
 
-def generate_chapter_content(book: dict, chapter_brief: dict, chapter_index: int, total: int, remaining_briefs: list = None) -> str:
+def _render_reference_tables(tables: list) -> str:
+    """Freeform author tables (a sports schedule, a timeline, anything) as
+    plain text the model can read and stay consistent with — e.g. not
+    inventing a score that contradicts one the author already logged."""
+    if not tables:
+        return ""
+    blocks = []
+    for t in tables:
+        columns = t.get("columns") or []
+        rows = t.get("rows") or []
+        if not rows:
+            continue
+        header = " | ".join(columns)
+        lines = [" | ".join(str(row.get(col, "")) for col in columns) for row in rows]
+        blocks.append(f"[{t.get('name', 'Table')}]\n{header}\n" + "\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def generate_chapter_content(
+    book: dict, chapter_brief: dict, chapter_index: int, total: int,
+    remaining_briefs: list = None, reference_tables: list = None,
+) -> str:
     characters_desc = "\n".join(f"- {c.get('name')} ({c.get('role', '')}): {c.get('description', '')}" for c in book.get("characters", []))
     threads_desc = "\n".join(f"- {t}" for t in book.get("plot_threads", []))
+    tables_desc = _render_reference_tables(reference_tables or [])
     label = TYPE_LABELS.get(book["book_type"], "book")
     style_instruction = _style_prompt(book)
     system = (
@@ -152,6 +179,9 @@ Characters:
 
 Ongoing plot threads:
 {threads_desc or 'N/A'}
+
+Reference tables the author is tracking (stay consistent with any data here):
+{tables_desc or 'N/A'}
 
 Story so far (running summary): {book.get('running_summary') or 'This is the first chapter.'}
 
@@ -265,9 +295,10 @@ async def run_generation(book_id: str):
                 book_doc["characters"] = fresh["characters"]
                 book_doc["plot_threads"] = fresh["plot_threads"]
                 book_doc["premise"] = fresh["premise"]
+            reference_tables = [dict(t) for t in await pool.fetch("select name, columns, rows from book_tables where book_id=$1", book_id)]
 
             content = await asyncio.to_thread(
-                generate_chapter_content, book_doc, brief, idx, len(chapters_brief), chapters_brief[idx + 1:]
+                generate_chapter_content, book_doc, brief, idx, len(chapters_brief), chapters_brief[idx + 1:], reference_tables
             )
             word_count = len(content.split())
             burn = round(word_count * multiplier)

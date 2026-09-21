@@ -44,6 +44,7 @@ export default function CreateBook() {
   const [prompt, setPrompt] = useState(draft.prompt ?? "");
   const [setting, setSetting] = useState(draft.setting ?? "");
   const [backstory, setBackstory] = useState(draft.backstory ?? "");
+  const [chapterOutline, setChapterOutline] = useState(draft.chapterOutline ?? "");
   const [characters, setCharacters] = useState(draft.characters ?? []);
   const [charName, setCharName] = useState("");
   const [charRole, setCharRole] = useState("");
@@ -73,12 +74,12 @@ export default function CreateBook() {
     try {
       localStorage.setItem(
         DRAFT_KEY,
-        JSON.stringify({ bookType, prompt, setting, backstory, characters, genre, tone, length, style, chimeraA, chimeraB })
+        JSON.stringify({ bookType, prompt, setting, backstory, chapterOutline, characters, genre, tone, length, style, chimeraA, chimeraB })
       );
     } catch {
       // best-effort — private browsing / storage full shouldn't block writing
     }
-  }, [bookType, prompt, setting, backstory, characters, genre, tone, length, style, chimeraA, chimeraB]);
+  }, [bookType, prompt, setting, backstory, chapterOutline, characters, genre, tone, length, style, chimeraA, chimeraB]);
 
   const selectedStyle = styles?.find((s) => s.key === style);
   const multiplier = useMemo(() => {
@@ -105,7 +106,7 @@ export default function CreateBook() {
     setLoading(true);
     setError("");
     try {
-      const payload = { book_type: bookType, prompt, setting, backstory, characters, genre, tone, length, style };
+      const payload = { book_type: bookType, prompt, setting, backstory, chapter_outline: chapterOutline, characters, genre, tone, length, style };
       if (style === "chimera") {
         payload.style_secondary_a = chimeraA;
         payload.style_secondary_b = chimeraB;
@@ -199,6 +200,25 @@ export default function CreateBook() {
             className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none"
             data-testid="create-book-backstory-input"
           />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-muted-foreground">chapter outline <span className="opacity-60">(optional — paste a rough one, or write it here)</span></label>
+            <span className="text-[10px] text-muted-foreground">{chapterOutline.length}/6000</span>
+          </div>
+          <textarea
+            rows={6}
+            maxLength={6000}
+            value={chapterOutline}
+            onChange={(e) => setChapterOutline(e.target.value)}
+            placeholder={"Ch 1: Mara arrives at the lighthouse, finds the logbook mid-sentence.\nCh 2: The first storm, radio goes dead...\n(one line or a paragraph per chapter — as rough as you want)"}
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none"
+            data-testid="create-book-chapter-outline-input"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1 opacity-70">
+            Leave blank and the AI builds the outline from your premise instead. Fill this in and it builds from your chapters, not its own.
+          </p>
         </div>
 
         <div>

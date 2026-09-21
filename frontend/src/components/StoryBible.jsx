@@ -6,10 +6,12 @@ export default function StoryBible({ bookId, book, onSaved }) {
   const [premise, setPremise] = useState(book.premise || "");
   const [characters, setCharacters] = useState(book.characters || []);
   const [plotThreads, setPlotThreads] = useState(book.plot_threads || []);
+  const [worldRules, setWorldRules] = useState(book.world_rules || []);
   const [charName, setCharName] = useState("");
   const [charRole, setCharRole] = useState("");
   const [charDesc, setCharDesc] = useState("");
   const [newThread, setNewThread] = useState("");
+  const [newRule, setNewRule] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -22,8 +24,9 @@ export default function StoryBible({ bookId, book, onSaved }) {
     setPremise(book.premise || "");
     setCharacters(book.characters || []);
     setPlotThreads(book.plot_threads || []);
+    setWorldRules(book.world_rules || []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book.premise, book.characters, book.plot_threads]);
+  }, [book.premise, book.characters, book.plot_threads, book.world_rules]);
 
   const markDirty = () => {
     setDirty(true);
@@ -54,9 +57,20 @@ export default function StoryBible({ bookId, book, onSaved }) {
     markDirty();
   };
 
+  const addRule = () => {
+    if (!newRule.trim()) return;
+    setWorldRules((r) => [...r, newRule.trim()]);
+    setNewRule("");
+    markDirty();
+  };
+  const removeRule = (idx) => {
+    setWorldRules((r) => r.filter((_, i) => i !== idx));
+    markDirty();
+  };
+
   const handleSave = async () => {
     setSaving(true);
-    await api.patch(`/books/${bookId}/bible`, { premise, characters, plot_threads: plotThreads });
+    await api.patch(`/books/${bookId}/bible`, { premise, characters, plot_threads: plotThreads, world_rules: worldRules });
     setSaving(false);
     setDirty(false);
     setSaved(true);
@@ -143,6 +157,36 @@ export default function StoryBible({ bookId, book, onSaved }) {
             />
             <button type="button" onClick={addThread} disabled={!newThread.trim()}
               className="py-2 px-4 border border-primary/50 text-primary hover:border-primary transition-colors disabled:opacity-40" data-testid="story-bible-thread-add-button">
+              + add
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-muted-foreground mb-2">world rules <span className="opacity-60">(special logic, satire hooks)</span></label>
+          {worldRules.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {worldRules.map((r, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 border border-border px-3 py-2" data-testid={`story-bible-rule-${i}`}>
+                  <span className="text-foreground/90">{r}</span>
+                  <button onClick={() => removeRule(i)} className="text-destructive shrink-0" data-testid={`story-bible-rule-remove-${i}`}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-3">
+            <input
+              value={newRule}
+              onChange={(e) => setNewRule(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRule(); } }}
+              placeholder='e.g. "Everyone in town forgets Tuesdays ever happened"'
+              className="flex-1 bg-transparent border border-border focus:border-primary outline-none px-3 py-2"
+              data-testid="story-bible-rule-input"
+            />
+            <button type="button" onClick={addRule} disabled={!newRule.trim()}
+              className="py-2 px-4 border border-primary/50 text-primary hover:border-primary transition-colors disabled:opacity-40" data-testid="story-bible-rule-add-button">
               + add
             </button>
           </div>

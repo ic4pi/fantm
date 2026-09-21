@@ -45,10 +45,21 @@ export default function CreateBook() {
   const [setting, setSetting] = useState(draft.setting ?? "");
   const [backstory, setBackstory] = useState(draft.backstory ?? "");
   const [chapterOutline, setChapterOutline] = useState(draft.chapterOutline ?? "");
+  const [timeline, setTimeline] = useState(draft.timeline ?? "");
+  const [worldRules, setWorldRules] = useState(draft.worldRules ?? []);
+  const [newRule, setNewRule] = useState("");
   const [characters, setCharacters] = useState(draft.characters ?? []);
   const [charName, setCharName] = useState("");
   const [charRole, setCharRole] = useState("");
   const [charDesc, setCharDesc] = useState("");
+
+  const MAX_WORLD_RULES = 30;
+  const addWorldRule = () => {
+    if (!newRule.trim() || worldRules.length >= MAX_WORLD_RULES) return;
+    setWorldRules((r) => [...r, newRule.trim()]);
+    setNewRule("");
+  };
+  const removeWorldRule = (idx) => setWorldRules((r) => r.filter((_, i) => i !== idx));
   const [genre, setGenre] = useState(draft.genre ?? "");
   const [tone, setTone] = useState(draft.tone ?? "");
   const [length, setLength] = useState(draft.length ?? "short");
@@ -74,12 +85,12 @@ export default function CreateBook() {
     try {
       localStorage.setItem(
         DRAFT_KEY,
-        JSON.stringify({ bookType, prompt, setting, backstory, chapterOutline, characters, genre, tone, length, style, chimeraA, chimeraB })
+        JSON.stringify({ bookType, prompt, setting, backstory, chapterOutline, timeline, worldRules, characters, genre, tone, length, style, chimeraA, chimeraB })
       );
     } catch {
       // best-effort — private browsing / storage full shouldn't block writing
     }
-  }, [bookType, prompt, setting, backstory, chapterOutline, characters, genre, tone, length, style, chimeraA, chimeraB]);
+  }, [bookType, prompt, setting, backstory, chapterOutline, timeline, worldRules, characters, genre, tone, length, style, chimeraA, chimeraB]);
 
   const selectedStyle = styles?.find((s) => s.key === style);
   const multiplier = useMemo(() => {
@@ -106,7 +117,11 @@ export default function CreateBook() {
     setLoading(true);
     setError("");
     try {
-      const payload = { book_type: bookType, prompt, setting, backstory, chapter_outline: chapterOutline, characters, genre, tone, length, style };
+      const payload = {
+        book_type: bookType, prompt, setting, backstory,
+        chapter_outline: chapterOutline, timeline, world_rules: worldRules,
+        characters, genre, tone, length, style,
+      };
       if (style === "chimera") {
         payload.style_secondary_a = chimeraA;
         payload.style_secondary_b = chimeraB;
@@ -219,6 +234,64 @@ export default function CreateBook() {
           <p className="text-[10px] text-muted-foreground mt-1 opacity-70">
             Leave blank and the AI builds the outline from your premise instead. Fill this in and it builds from your chapters, not its own.
           </p>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-muted-foreground">timeline <span className="opacity-60">(optional — a simpler alternative to a chapter outline)</span></label>
+            <span className="text-[10px] text-muted-foreground">{timeline.length}/6000</span>
+          </div>
+          <textarea
+            rows={4}
+            maxLength={6000}
+            value={timeline}
+            onChange={(e) => setTimeline(e.target.value)}
+            placeholder={"Day 1: Mara arrives.\nDay 12: first storm, radio goes dead.\nDay 40: the flood.\n(just the sequence of events — the AI still decides how to split it into chapters)"}
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none"
+            data-testid="create-book-timeline-input"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1 opacity-70">
+            Use this instead of a chapter outline if you just want the order of events right, not a full chapter-by-chapter breakdown.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-muted-foreground mb-2">
+            world rules <span className="opacity-60">(optional — special logic, satire hooks, "fucked up things" the story can draw on)</span>
+          </label>
+          {worldRules.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {worldRules.map((rule, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 border border-border px-3 py-2" data-testid={`world-rule-row-${i}`}>
+                  <span className="text-foreground/90">{rule}</span>
+                  <button type="button" onClick={() => removeWorldRule(i)} className="text-destructive text-xs shrink-0" data-testid={`world-rule-remove-${i}`}>
+                    remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {worldRules.length < MAX_WORLD_RULES && (
+            <div className="flex gap-3">
+              <input
+                value={newRule}
+                onChange={(e) => setNewRule(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addWorldRule(); } }}
+                placeholder={'e.g. "Everyone in town forgets Tuesdays ever happened" — doesn\'t have to be used, just available'}
+                className="flex-1 bg-transparent border border-border focus:border-primary outline-none px-3 py-2"
+                data-testid="world-rule-input"
+              />
+              <button
+                type="button"
+                onClick={addWorldRule}
+                disabled={!newRule.trim()}
+                className="py-2 px-4 border border-primary/50 text-primary hover:border-primary transition-colors disabled:opacity-40"
+                data-testid="world-rule-add-button"
+              >
+                + add
+              </button>
+            </div>
+          )}
         </div>
 
         <div>

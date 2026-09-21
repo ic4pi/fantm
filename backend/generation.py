@@ -103,9 +103,18 @@ def generate_outline(book: dict) -> dict:
             "(do not rename, contradict, or replace them; you may add supporting characters as needed). "
             f'Your JSON response\'s "characters" list must include all of them verbatim:\n{listed}\n'
         )
+    world_rules = book.get("world_rules") or []
+    world_rules_block = ""
+    if world_rules:
+        listed_rules = "\n".join(f"- {r}" for r in world_rules)
+        world_rules_block = (
+            "\nSpecial rules for how this world works, or story elements to draw on — "
+            "these override normal-world logic where they apply. Not every one has to appear; "
+            f"use what fits:\n{listed_rules}\n"
+        )
     user = f"""Create a book outline for a {book['book_type']} with genre "{book['genre']}" and tone "{book['tone']}".
 User's prompt/premise: {book['prompt']}
-{characters_block}
+{characters_block}{world_rules_block}
 Return JSON with this exact shape:
 {{
   "title": "book title",
@@ -158,6 +167,7 @@ def generate_chapter_content(
 ) -> str:
     characters_desc = "\n".join(f"- {c.get('name')} ({c.get('role', '')}): {c.get('description', '')}" for c in book.get("characters", []))
     threads_desc = "\n".join(f"- {t}" for t in book.get("plot_threads", []))
+    world_rules_desc = "\n".join(f"- {r}" for r in book.get("world_rules", []))
     tables_desc = _render_reference_tables(reference_tables or [])
     label = TYPE_LABELS.get(book["book_type"], "book")
     style_instruction = _style_prompt(book)
@@ -179,6 +189,9 @@ Characters:
 
 Ongoing plot threads:
 {threads_desc or 'N/A'}
+
+Special world rules / satire elements (override normal-world logic where they apply; not all need to appear):
+{world_rules_desc or 'N/A'}
 
 Reference tables the author is tracking (stay consistent with any data here):
 {tables_desc or 'N/A'}
@@ -290,11 +303,12 @@ async def run_generation(book_id: str):
             # not-yet-written chapter instead of being silently clobbered by
             # the continuity update below (which otherwise writes back
             # whatever book_doc already held before the user's edit).
-            fresh = await pool.fetchrow("select characters, plot_threads, premise from books where id=$1", book_id)
+            fresh = await pool.fetchrow("select characters, plot_threads, premise, world_rules from books where id=$1", book_id)
             if fresh:
                 book_doc["characters"] = fresh["characters"]
                 book_doc["plot_threads"] = fresh["plot_threads"]
                 book_doc["premise"] = fresh["premise"]
+                book_doc["world_rules"] = fresh["world_rules"]
             reference_tables = [dict(t) for t in await pool.fetch("select name, columns, rows from book_tables where book_id=$1", book_id)]
 
             content = await asyncio.to_thread(

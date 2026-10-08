@@ -1,12 +1,23 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
+import ListInput from "@/components/ListInput";
+import { POV_OPTIONS } from "@/lib/storyBible";
 import { BookOpen, Plus, Trash2, Save } from "lucide-react";
+
+// Plain-text Story Bible fields (books.bible) — edited and saved as one group.
+const TEXT_FIELDS = ["setting", "backstory", "pov", "style_notes", "influences", "subject", "period"];
+
+function bibleText(bible) {
+  return Object.fromEntries(TEXT_FIELDS.map((k) => [k, bible?.[k] || ""]));
+}
 
 export default function StoryBible({ bookId, book, onSaved }) {
   const [premise, setPremise] = useState(book.premise || "");
   const [characters, setCharacters] = useState(book.characters || []);
   const [plotThreads, setPlotThreads] = useState(book.plot_threads || []);
   const [worldRules, setWorldRules] = useState(book.world_rules || []);
+  const [text, setText] = useState(bibleText(book.bible));
+  const [themes, setThemes] = useState(book.bible?.themes || []);
   const [charName, setCharName] = useState("");
   const [charRole, setCharRole] = useState("");
   const [charDesc, setCharDesc] = useState("");
@@ -25,12 +36,19 @@ export default function StoryBible({ bookId, book, onSaved }) {
     setCharacters(book.characters || []);
     setPlotThreads(book.plot_threads || []);
     setWorldRules(book.world_rules || []);
+    setText(bibleText(book.bible));
+    setThemes(book.bible?.themes || []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book.premise, book.characters, book.plot_threads, book.world_rules]);
+  }, [book.premise, book.characters, book.plot_threads, book.world_rules, book.bible]);
 
   const markDirty = () => {
     setDirty(true);
     setSaved(false);
+  };
+
+  const setField = (key) => (e) => {
+    setText((t) => ({ ...t, [key]: e.target.value }));
+    markDirty();
   };
 
   const addCharacter = () => {
@@ -70,7 +88,7 @@ export default function StoryBible({ bookId, book, onSaved }) {
 
   const handleSave = async () => {
     setSaving(true);
-    await api.patch(`/books/${bookId}/bible`, { premise, characters, plot_threads: plotThreads, world_rules: worldRules });
+    await api.patch(`/books/${bookId}/bible`, { premise, characters, plot_threads: plotThreads, world_rules: worldRules, themes, ...text });
     setSaving(false);
     setDirty(false);
     setSaved(true);
@@ -98,6 +116,59 @@ export default function StoryBible({ bookId, book, onSaved }) {
             className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none"
             data-testid="story-bible-premise-input"
           />
+        </div>
+
+        {book.book_type !== "novel" && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-muted-foreground mb-2">subject</label>
+              <input value={text.subject} onChange={setField("subject")} maxLength={200}
+                className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2" data-testid="story-bible-subject-input" />
+            </div>
+            <div>
+              <label className="block text-muted-foreground mb-2">time period covered</label>
+              <input value={text.period} onChange={setField("period")} maxLength={200}
+                className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2" data-testid="story-bible-period-input" />
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-muted-foreground mb-2">setting</label>
+          <textarea rows={2} value={text.setting} onChange={setField("setting")} maxLength={2000}
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none" data-testid="story-bible-setting-input" />
+        </div>
+
+        <div>
+          <label className="block text-muted-foreground mb-2">backstory</label>
+          <textarea rows={2} value={text.backstory} onChange={setField("backstory")} maxLength={3000}
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none" data-testid="story-bible-backstory-input" />
+        </div>
+
+        <div>
+          <label className="block text-muted-foreground mb-2">themes</label>
+          <ListInput items={themes} onChange={(next) => { setThemes(next); markDirty(); }} max={15} placeholder="a theme to keep returning to..." testId="story-bible-theme" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-muted-foreground mb-2">point of view</label>
+            <select value={text.pov} onChange={setField("pov")}
+              className="w-full bg-background border border-border focus:border-primary outline-none px-3 py-2" data-testid="story-bible-pov-select">
+              {POV_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-muted-foreground mb-2">influences</label>
+            <input value={text.influences} onChange={setField("influences")} maxLength={500}
+              className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2" data-testid="story-bible-influences-input" />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-muted-foreground mb-2">style notes</label>
+          <textarea rows={2} value={text.style_notes} onChange={setField("style_notes")} maxLength={2000}
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none" data-testid="story-bible-style-notes-input" />
         </div>
 
         <div>

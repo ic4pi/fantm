@@ -25,21 +25,45 @@ class CharacterSeedIn(BaseModel):
     description: str = Field("", max_length=500)
 
 
+MAX_TABLES_PER_BOOK = 20
+MAX_ROWS_PER_TABLE = 500
+POV_PATTERN = "^(|first_person|third_limited|third_omniscient|second_person)$"
+
+
+class TableSeedIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    columns: list[str] = Field(default_factory=list, max_length=20)
+    rows: list[dict] = Field(default_factory=list, max_length=MAX_ROWS_PER_TABLE)
+
+
 class CreateBookIn(BaseModel):
     book_type: str = Field(pattern="^(novel|memoir|biography)$")
     prompt: str = Field(min_length=10, max_length=4000)
+    title: str = Field("", max_length=200)
     genre: str = ""
     tone: str = ""
     setting: str = Field("", max_length=2000)
     backstory: str = Field("", max_length=3000)
+    themes: list[str] = Field(default_factory=list, max_length=15)
+    pov: str = Field("", pattern=POV_PATTERN)
+    style_notes: str = Field("", max_length=2000)
+    influences: str = Field("", max_length=500)
+    subject: str = Field("", max_length=200)
+    period: str = Field("", max_length=200)
     chapter_outline: str = Field("", max_length=6000)
     timeline: str = Field("", max_length=6000)
     world_rules: list[str] = Field(default_factory=list, max_length=30)
     characters: list[CharacterSeedIn] = Field(default_factory=list, max_length=12)
+    tables: list[TableSeedIn] = Field(default_factory=list, max_length=MAX_TABLES_PER_BOOK)
     length: str = Field(pattern="^(short|medium|long)$")
     style: str = "house"
     style_secondary_a: Optional[str] = None
     style_secondary_b: Optional[str] = None
+
+
+# Story Bible fields kept in books.bible — editable after creation, and read
+# fresh before every chapter. Title is set once at creation and not listed.
+BIBLE_FIELDS = ("setting", "backstory", "themes", "pov", "style_notes", "influences", "subject", "period")
 
 
 class UpdateChapterIn(BaseModel):
@@ -54,7 +78,7 @@ class TableIn(BaseModel):
 class TableUpdateIn(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     columns: Optional[list[str]] = Field(None, max_length=20)
-    rows: Optional[list[dict]] = Field(None, max_length=500)
+    rows: Optional[list[dict]] = Field(None, max_length=MAX_ROWS_PER_TABLE)
 
 
 def serialize_table(t: dict) -> dict:
@@ -74,6 +98,14 @@ class UpdateBibleIn(BaseModel):
     characters: Optional[list[CharacterSeedIn]] = Field(None, max_length=30)
     plot_threads: Optional[list[str]] = Field(None, max_length=30)
     world_rules: Optional[list[str]] = Field(None, max_length=30)
+    setting: Optional[str] = Field(None, max_length=2000)
+    backstory: Optional[str] = Field(None, max_length=3000)
+    themes: Optional[list[str]] = Field(None, max_length=15)
+    pov: Optional[str] = Field(None, pattern=POV_PATTERN)
+    style_notes: Optional[str] = Field(None, max_length=2000)
+    influences: Optional[str] = Field(None, max_length=500)
+    subject: Optional[str] = Field(None, max_length=200)
+    period: Optional[str] = Field(None, max_length=200)
 
 
 def _iso(v):
@@ -96,6 +128,7 @@ def serialize_book(b: dict) -> dict:
         "characters": b.get("characters", []),
         "plot_threads": b.get("plot_threads", []),
         "world_rules": b.get("world_rules", []),
+        "bible": b.get("bible") or {},
         "outline": b.get("outline", []),
         "total_chapters": b.get("total_chapters", 0),
         "current_chapter": b.get("current_chapter", 0),
@@ -164,10 +197,6 @@ async def create_book(body: CreateBookIn, user=Depends(get_current_user)):
         raise HTTPException(402, f"Not enough Neural Credits. This book needs ~{estimated_cost} NC, you have {balance} NC. Visit the Store to top up.")
 
     composed_prompt = body.prompt
-    if body.setting.strip():
-        composed_prompt += f"\n\nSetting: {body.setting.strip()}"
-    if body.backstory.strip():
-        composed_prompt += f"\n\nBackstory: {body.backstory.strip()}"
     if body.chapter_outline.strip():
         composed_prompt += (
             "\n\nAuthor-provided chapter outline — use this exact chapter breakdown "
@@ -183,19 +212,26 @@ async def create_book(body: CreateBookIn, user=Depends(get_current_user)):
             f"{body.timeline.strip()}"
         )
     seed_characters = [c.model_dump() for c in body.characters]
+    bible = {
+        k: v.strip() if isinstance(v, str) else [t.strip() for t in v if t.strip()]
+        for k, v in body.model_dump(include=set(BIBLE_FIELDS)).items()
+    }
+    title = body.title.strip()
+    if title:
+        bible["title"] = title
 
     pool = await get_pool()
     now = datetime.now(timezone.utc)
     row = await pool.fetchrow(
         """insert into books (
              user_id, title, book_type, genre, tone, length, style,
-             style_secondary_a, style_secondary_b, prompt, characters, world_rules, total_chapters,
+             style_secondary_a, style_secondary_b, prompt, characters, world_rules, bible, total_chapters,
              reserved_nc, settled, created_at, updated_at
-           ) values ($1,'Generating...',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,false,$14,$14)
+           ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,false,$16,$16)
            returning *""",
-        str(user["id"]), body.book_type, body.genre, body.tone, body.length, body.style,
-        body.style_secondary_a, body.style_secondary_b, composed_prompt, seed_characters, body.world_rules, total_chapters,
-        estimated_cost, now,
+        str(user["id"]), title or "Generating...", body.book_type, body.genre, body.tone, body.length, body.style,
+        body.style_secondary_a, body.style_secondary_b, composed_prompt, seed_characters, body.world_rules, bible,
+        total_chapters, estimated_cost, now,
     )
     book_doc = dict(row)
     book_id = str(book_doc["id"])
@@ -214,6 +250,16 @@ async def create_book(body: CreateBookIn, user=Depends(get_current_user)):
         await pool.execute("delete from books where id = $1", book_doc["id"])
         current = await get_balance(str(user["id"]))
         raise HTTPException(402, f"Not enough Neural Credits. This book needs ~{estimated_cost} NC, you have {current} NC. Visit the Store to top up.")
+
+    # Tables go in before generation starts so the outline is planned around
+    # them — a season schedule or a results table decides what happens and in
+    # what order, which is too late to learn after chapter 1 is written.
+    if body.tables:
+        await pool.executemany(
+            """insert into book_tables (book_id, name, columns, rows, created_at, updated_at)
+               values ($1, $2, $3, $4, $5, $5)""",
+            [(book_doc["id"], t.name, t.columns, t.rows, now) for t in body.tables],
+        )
 
     asyncio.create_task(run_generation(book_id))
     return serialize_book(book_doc)
@@ -248,9 +294,10 @@ async def update_bible(book_id: str, body: UpdateBibleIn, user=Depends(get_curre
     characters = [c.model_dump() for c in body.characters] if body.characters is not None else book.get("characters", [])
     plot_threads = body.plot_threads if body.plot_threads is not None else book.get("plot_threads", [])
     world_rules = body.world_rules if body.world_rules is not None else book.get("world_rules", [])
+    bible = (book.get("bible") or {}) | body.model_dump(include=set(BIBLE_FIELDS), exclude_none=True)
     row = await pool.fetchrow(
-        "update books set premise=$2, characters=$3, plot_threads=$4, world_rules=$5, updated_at=$6 where id=$1 returning *",
-        book["id"], premise, characters, plot_threads, world_rules, datetime.now(timezone.utc),
+        "update books set premise=$2, characters=$3, plot_threads=$4, world_rules=$5, bible=$6, updated_at=$7 where id=$1 returning *",
+        book["id"], premise, characters, plot_threads, world_rules, bible, datetime.now(timezone.utc),
     )
     return serialize_book(dict(row))
 
@@ -365,9 +412,6 @@ async def export_pdf(book_id: str, user=Depends(get_current_user)):
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={safe_title}.pdf"},
     )
-
-
-MAX_TABLES_PER_BOOK = 20
 
 
 @router.get("/{book_id}/tables")

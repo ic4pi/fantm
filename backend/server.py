@@ -57,6 +57,7 @@ async def health():
 @app.on_event("startup")
 async def startup():
     await db.connect()
+    await db.apply_migrations()
 
     absent = config.missing_optional_env()
     if absent:

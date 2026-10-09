@@ -85,7 +85,40 @@ def _parse_json_loose(text: str) -> dict:
     return json.loads(repair_json(text))
 
 
-def generate_outline(book: dict) -> dict:
+POV_LABELS = {
+    "first_person": 'first person ("I")',
+    "third_limited": "third person limited — stay close to one character's perspective at a time",
+    "third_omniscient": "third person omniscient",
+    "second_person": 'second person ("you")',
+}
+
+
+def _render_bible(book: dict) -> str:
+    """The author's fixed Story Bible choices (setting, POV, themes...) as
+    plain text. Rendered into the outline AND every chapter — these used to
+    live only in the prompt the outline reads, so chapter 6 never saw them."""
+    bible = book.get("bible") or {}
+    lines = []
+    if bible.get("subject"):
+        lines.append(f"Subject: {bible['subject']}")
+    if bible.get("period"):
+        lines.append(f"Time period covered: {bible['period']}")
+    if bible.get("setting"):
+        lines.append(f"Setting: {bible['setting']}")
+    if bible.get("backstory"):
+        lines.append(f"Backstory: {bible['backstory']}")
+    if bible.get("themes"):
+        lines.append("Themes to explore: " + "; ".join(bible["themes"]))
+    if bible.get("pov") in POV_LABELS:
+        lines.append(f"Point of view: write in {POV_LABELS[bible['pov']]}")
+    if bible.get("influences"):
+        lines.append(f"Influences (draw on their voice, pacing and structure — never copy their text): {bible['influences']}")
+    if bible.get("style_notes"):
+        lines.append(f"Author's style notes: {bible['style_notes']}")
+    return "\n".join(lines)
+
+
+def generate_outline(book: dict, reference_tables: list = None) -> dict:
     n_chapters = LENGTH_CHAPTERS.get(book["length"], 8)
     label = TYPE_LABELS.get(book["book_type"], "book")
     system = (
@@ -112,9 +145,19 @@ def generate_outline(book: dict) -> dict:
             "these override normal-world logic where they apply. Not every one has to appear; "
             f"use what fits:\n{listed_rules}\n"
         )
+    bible_desc = _render_bible(book)
+    bible_block = f"\nStory bible — the author's fixed choices, follow them:\n{bible_desc}\n" if bible_desc else ""
+    tables_desc = _render_reference_tables(reference_tables or [])
+    tables_block = (
+        "\nReference tables the author is tracking — treat them as canon and plan around them. "
+        "A schedule fixes the order of events; a results table fixes who wins and by how much:\n"
+        f"{tables_desc}\n"
+    ) if tables_desc else ""
+    fixed_title = (book.get("bible") or {}).get("title")
+    title_block = f'\nThe author has titled this book "{fixed_title}" — use that exact title.\n' if fixed_title else ""
     user = f"""Create a book outline for a {book['book_type']} with genre "{book['genre']}" and tone "{book['tone']}".
 User's prompt/premise: {book['prompt']}
-{characters_block}{world_rules_block}
+{title_block}{bible_block}{characters_block}{world_rules_block}{tables_block}
 Return JSON with this exact shape:
 {{
   "title": "book title",
@@ -143,22 +186,30 @@ def _style_prompt(book: dict) -> str:
     return pricing.WRITER_STYLES.get(style, pricing.WRITER_STYLES["house"]).get("prompt", "")
 
 
+MAX_TABLES_PROMPT_CHARS = 12000
+
+
 def _render_reference_tables(tables: list) -> str:
     """Freeform author tables (a sports schedule, a timeline, anything) as
     plain text the model can read and stay consistent with — e.g. not
-    inventing a score that contradicts one the author already logged."""
+    inventing a score that contradicts one the author already logged.
+    Capped so 20 full tables can't crowd the chapter itself out of the
+    model's context."""
     if not tables:
         return ""
     blocks = []
     for t in tables:
         columns = t.get("columns") or []
         rows = t.get("rows") or []
-        if not rows:
+        if not rows or not columns:
             continue
         header = " | ".join(columns)
         lines = [" | ".join(str(row.get(col, "")) for col in columns) for row in rows]
         blocks.append(f"[{t.get('name', 'Table')}]\n{header}\n" + "\n".join(lines))
-    return "\n\n".join(blocks)
+    text = "\n\n".join(blocks)
+    if len(text) > MAX_TABLES_PROMPT_CHARS:
+        text = text[:MAX_TABLES_PROMPT_CHARS] + "\n[...tables truncated]"
+    return text
 
 
 def generate_chapter_content(
@@ -169,6 +220,7 @@ def generate_chapter_content(
     threads_desc = "\n".join(f"- {t}" for t in book.get("plot_threads", []))
     world_rules_desc = "\n".join(f"- {r}" for r in book.get("world_rules", []))
     tables_desc = _render_reference_tables(reference_tables or [])
+    bible_desc = _render_bible(book)
     label = TYPE_LABELS.get(book["book_type"], "book")
     style_instruction = _style_prompt(book)
     system = (
@@ -184,6 +236,9 @@ def generate_chapter_content(
     )
     user = f"""Book premise: {book.get('premise', '')}
 
+Story bible (the author's fixed choices — follow them):
+{bible_desc or 'N/A'}
+
 Characters:
 {characters_desc or 'N/A'}
 
@@ -193,7 +248,7 @@ Ongoing plot threads:
 Special world rules / satire elements (override normal-world logic where they apply; not all need to appear):
 {world_rules_desc or 'N/A'}
 
-Reference tables the author is tracking (stay consistent with any data here):
+Reference tables the author is tracking (canon — never contradict a logged date, opponent, score, result or fact):
 {tables_desc or 'N/A'}
 
 Story so far (running summary): {book.get('running_summary') or 'This is the first chapter.'}
@@ -271,9 +326,10 @@ async def run_generation(book_id: str):
         style_secondary_b=book_doc.get("style_secondary_b"),
     )
     try:
-        outline = await asyncio.to_thread(generate_outline, book_doc)
+        seed_tables = [dict(t) for t in await pool.fetch("select name, columns, rows from book_tables where book_id=$1 order by created_at", book_id)]
+        outline = await asyncio.to_thread(generate_outline, book_doc, seed_tables)
         chapters_brief = outline.get("chapters", [])
-        title = outline.get("title", book_doc["title"])
+        title = (book_doc.get("bible") or {}).get("title") or outline.get("title", book_doc["title"])
         premise = outline.get("premise", "")
         cover_image_url = build_cover_url(book_id, title, premise)
         await pool.execute(
@@ -303,13 +359,14 @@ async def run_generation(book_id: str):
             # not-yet-written chapter instead of being silently clobbered by
             # the continuity update below (which otherwise writes back
             # whatever book_doc already held before the user's edit).
-            fresh = await pool.fetchrow("select characters, plot_threads, premise, world_rules from books where id=$1", book_id)
+            fresh = await pool.fetchrow("select characters, plot_threads, premise, world_rules, bible from books where id=$1", book_id)
             if fresh:
                 book_doc["characters"] = fresh["characters"]
                 book_doc["plot_threads"] = fresh["plot_threads"]
                 book_doc["premise"] = fresh["premise"]
                 book_doc["world_rules"] = fresh["world_rules"]
-            reference_tables = [dict(t) for t in await pool.fetch("select name, columns, rows from book_tables where book_id=$1", book_id)]
+                book_doc["bible"] = fresh["bible"]
+            reference_tables = [dict(t) for t in await pool.fetch("select name, columns, rows from book_tables where book_id=$1 order by created_at", book_id)]
 
             content = await asyncio.to_thread(
                 generate_chapter_content, book_doc, brief, idx, len(chapters_brief), chapters_brief[idx + 1:], reference_tables

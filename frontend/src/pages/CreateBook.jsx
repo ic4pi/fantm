@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { InsufficientCreditsModal } from "@/components/InsufficientCreditsModal";
+import ListInput from "@/components/ListInput";
+import { NewTableForm, TableGrid } from "@/components/TableGrid";
+import { MAX_TABLES, POV_OPTIONS } from "@/lib/storyBible";
 import { Lock, Zap } from "lucide-react";
 
 const BOOK_TYPES = [
@@ -18,6 +21,17 @@ const LENGTHS = [
 ];
 
 const WORDS_PER_CHAPTER = 900;
+
+const MAX_THEMES = 15;
+
+function SectionHeading({ children, note }) {
+  return (
+    <div className="pt-4 border-t border-border">
+      <p className="font-mono text-accent text-xs tracking-widest">{children}</p>
+      {note && <p className="text-[11px] text-muted-foreground mt-1 opacity-80">{note}</p>}
+    </div>
+  );
+}
 
 // A book premise can take a while to dictate. Nothing else on this page
 // persists it, so a stray reload/backgrounded-tab reset used to wipe
@@ -41,7 +55,15 @@ export default function CreateBook() {
   const { data: balanceData } = useQuery({ queryKey: ["credits-balance"], queryFn: async () => (await api.get("/credits/balance")).data });
 
   const [bookType, setBookType] = useState(draft.bookType ?? "novel");
+  const [title, setTitle] = useState(draft.title ?? "");
   const [prompt, setPrompt] = useState(draft.prompt ?? "");
+  const [subject, setSubject] = useState(draft.subject ?? "");
+  const [period, setPeriod] = useState(draft.period ?? "");
+  const [themes, setThemes] = useState(draft.themes ?? []);
+  const [pov, setPov] = useState(draft.pov ?? "");
+  const [styleNotes, setStyleNotes] = useState(draft.styleNotes ?? "");
+  const [influences, setInfluences] = useState(draft.influences ?? "");
+  const [tables, setTables] = useState(draft.tables ?? []);
   const [setting, setSetting] = useState(draft.setting ?? "");
   const [backstory, setBackstory] = useState(draft.backstory ?? "");
   const [chapterOutline, setChapterOutline] = useState(draft.chapterOutline ?? "");
@@ -81,16 +103,27 @@ export default function CreateBook() {
   };
   const removeCharacter = (idx) => setCharacters((c) => c.filter((_, i) => i !== idx));
 
+  const addTable = ({ name, columns }) =>
+    setTables((ts) => [...ts, { key: `${Date.now()}-${ts.length}`, name, columns, rows: [] }]);
+  const updateTable = (key, next) => setTables((ts) => ts.map((t) => (t.key === key ? next : t)));
+  const removeTable = (key) => setTables((ts) => ts.filter((t) => t.key !== key));
+
   useEffect(() => {
     try {
       localStorage.setItem(
         DRAFT_KEY,
-        JSON.stringify({ bookType, prompt, setting, backstory, chapterOutline, timeline, worldRules, characters, genre, tone, length, style, chimeraA, chimeraB })
+        JSON.stringify({
+          bookType, title, prompt, subject, period, setting, backstory, themes, chapterOutline, timeline, worldRules, characters, tables,
+          genre, tone, pov, styleNotes, influences, length, style, chimeraA, chimeraB,
+        })
       );
     } catch {
       // best-effort — private browsing / storage full shouldn't block writing
     }
-  }, [bookType, prompt, setting, backstory, chapterOutline, timeline, worldRules, characters, genre, tone, length, style, chimeraA, chimeraB]);
+  }, [
+    bookType, title, prompt, subject, period, setting, backstory, themes, chapterOutline, timeline, worldRules, characters, tables,
+    genre, tone, pov, styleNotes, influences, length, style, chimeraA, chimeraB,
+  ]);
 
   const selectedStyle = styles?.find((s) => s.key === style);
   const multiplier = useMemo(() => {
@@ -117,10 +150,13 @@ export default function CreateBook() {
     setLoading(true);
     setError("");
     try {
+      const isLife = bookType !== "novel";
       const payload = {
-        book_type: bookType, prompt, setting, backstory,
+        book_type: bookType, title, prompt, setting, backstory, themes,
+        subject: isLife ? subject : "", period: isLife ? period : "",
         chapter_outline: chapterOutline, timeline, world_rules: worldRules,
-        characters, genre, tone, length, style,
+        characters, genre, tone, pov, style_notes: styleNotes, influences, length, style,
+        tables: tables.map(({ name, columns, rows }) => ({ name, columns, rows })),
       };
       if (style === "chimera") {
         payload.style_secondary_a = chimeraA;
@@ -168,6 +204,18 @@ export default function CreateBook() {
         </div>
 
         <div>
+          <label className="block text-muted-foreground mb-2">title <span className="opacity-60">(optional — leave blank and the AI names it)</span></label>
+          <input
+            maxLength={200}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Blue Line"
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2"
+            data-testid="create-book-title-input"
+          />
+        </div>
+
+        <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-muted-foreground">prompt / premise</label>
             <span className="text-[10px] text-muted-foreground">{prompt.length}/4000</span>
@@ -184,6 +232,37 @@ export default function CreateBook() {
             data-testid="create-book-prompt-input"
           />
         </div>
+
+        {bookType !== "novel" && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-muted-foreground mb-2">{bookType === "memoir" ? "whose memoir" : "subject"}</label>
+              <input
+                maxLength={200}
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder={bookType === "memoir" ? "you, or the name you write under" : "Amelia Earhart"}
+                className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2"
+                data-testid="create-book-subject-input"
+              />
+            </div>
+            <div>
+              <label className="block text-muted-foreground mb-2">time period covered</label>
+              <input
+                maxLength={200}
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                placeholder="1897 – 1937"
+                className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2"
+                data-testid="create-book-period-input"
+              />
+            </div>
+          </div>
+        )}
+
+        <SectionHeading note="Everything below is canon. The AI plans the outline around it and re-reads it before every chapter. All optional.">
+          // STORY BIBLE
+        </SectionHeading>
 
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -215,6 +294,11 @@ export default function CreateBook() {
             className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none"
             data-testid="create-book-backstory-input"
           />
+        </div>
+
+        <div>
+          <label className="block text-muted-foreground mb-2">themes <span className="opacity-60">(optional — up to {MAX_THEMES})</span></label>
+          <ListInput items={themes} onChange={setThemes} max={MAX_THEMES} placeholder="redemption, loyalty, what winning costs..." testId="create-book-theme" />
         </div>
 
         <div>
@@ -348,6 +432,22 @@ export default function CreateBook() {
           )}
         </div>
 
+        <div>
+          <label className="block text-muted-foreground mb-2">
+            reference tables <span className="opacity-60">(optional — opponents, schedule, results, a roster... hard data the AI must not contradict)</span>
+          </label>
+          <div className="space-y-4 mb-3">
+            {tables.map((t, i) => (
+              <TableGrid key={t.key} table={t} onChange={(next) => updateTable(t.key, next)} onDelete={() => removeTable(t.key)} testId={`create-book-table-${i}`} />
+            ))}
+          </div>
+          {tables.length < MAX_TABLES && (
+            <NewTableForm existingNames={tables.map((t) => t.name)} onCreate={addTable} testId="create-book-new-table" />
+          )}
+        </div>
+
+        <SectionHeading>// VOICE</SectionHeading>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-muted-foreground mb-2">genre</label>
@@ -369,6 +469,46 @@ export default function CreateBook() {
               data-testid="create-book-tone-input"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-muted-foreground mb-2">point of view</label>
+          <select
+            value={pov}
+            onChange={(e) => setPov(e.target.value)}
+            className="w-full bg-background border border-border focus:border-primary outline-none px-3 py-2"
+            data-testid="create-book-pov-select"
+          >
+            {POV_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-muted-foreground">style notes <span className="opacity-60">(optional — how you want it written)</span></label>
+            <span className="text-[10px] text-muted-foreground">{styleNotes.length}/2000</span>
+          </div>
+          <textarea
+            rows={3}
+            maxLength={2000}
+            value={styleNotes}
+            onChange={(e) => setStyleNotes(e.target.value)}
+            placeholder="Short punchy sentences during games, slower and quieter off the ice. Locker-room dialogue stays profane. No epilogue."
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none"
+            data-testid="create-book-style-notes-input"
+          />
+        </div>
+
+        <div>
+          <label className="block text-muted-foreground mb-2">influences <span className="opacity-60">(optional — books or authors to draw on)</span></label>
+          <input
+            maxLength={500}
+            value={influences}
+            onChange={(e) => setInfluences(e.target.value)}
+            placeholder="Friday Night Lights, Moneyball"
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2"
+            data-testid="create-book-influences-input"
+          />
         </div>
 
         <div>

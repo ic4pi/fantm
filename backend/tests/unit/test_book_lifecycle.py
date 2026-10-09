@@ -107,7 +107,7 @@ RESERVED = 5000
 
 @pytest.fixture
 def pending_book(db, monkeypatch):
-    monkeypatch.setattr(generation, "generate_outline", lambda bk: {
+    monkeypatch.setattr(generation, "generate_outline", lambda bk, tables=None: {
         "title": "The Sleepless Keeper", "premise": "A premise.", "characters": [], "plot_threads": [],
         "chapters": [{"title": "One", "summary": "s"}, {"title": "Two", "summary": "s"}],
     })
@@ -158,7 +158,7 @@ def test_a_failed_generation_only_charges_for_what_it_wrote(db, pending_book, mo
 
 def test_a_book_that_never_started_is_refunded_in_full(db, pending_book, monkeypatch):
     monkeypatch.setattr(generation, "generate_outline",
-                         lambda bk: (_ for _ in ()).throw(RuntimeError("groq down")))
+                         lambda bk, tables=None: (_ for _ in ()).throw(RuntimeError("groq down")))
     db.call(generation.run_generation, pending_book["book_id"])
     assert db.call(_get_book, pending_book["book_id"])["status"] == "failed"
     assert db.call(credits.get_balance, pending_book["user_id"]) == START_BALANCE

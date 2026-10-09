@@ -1,7 +1,13 @@
 import json
+import logging
 import os
+from pathlib import Path
 
 import asyncpg
+
+logger = logging.getLogger(__name__)
+
+MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 
@@ -34,3 +40,17 @@ async def disconnect():
     if pool is not None:
         await pool.close()
         pool = None
+
+
+async def apply_migrations():
+    """Run every migrations/*.sql in order. Each one is written to be
+    idempotent (if not exists), so this is safe on every boot, and a deploy
+    whose code needs a new column can't go live ahead of that column. A file
+    that fails (e.g. a role without permission to create an extension) is
+    logged and skipped rather than blocking the ones after it."""
+    pool = await get_pool()
+    for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        try:
+            await pool.execute(path.read_text())
+        except Exception:
+            logger.exception("Migration %s failed", path.name)

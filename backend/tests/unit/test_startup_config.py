@@ -84,3 +84,15 @@ def test_provider_keys_are_advisory_not_fatal(env, monkeypatch):
         monkeypatch.delenv(name, raising=False)
     config.validate_required_env()
     assert set(config.missing_optional_env()) == set(config.OPTIONAL_ENV)
+
+
+def test_startup_migrations_restore_a_missing_column(client):
+    # A database that predates migration 005 gets books.bible on boot.
+    async def drop_then_migrate():
+        import db
+        pool = await db.get_pool()
+        await pool.execute("alter table books drop column if exists bible")
+        await db.apply_migrations()
+        return await pool.fetchval(
+            "select count(*) from information_schema.columns where table_name='books' and column_name='bible'")
+    assert client.portal.call(drop_then_migrate) == 1

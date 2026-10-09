@@ -37,7 +37,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 _BASE_DB_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost/fantm_test")
 _WORKER_ID = os.environ.get("PYTEST_XDIST_WORKER", "master")
 _TEST_DB_NAME = f"fantm_test_{_WORKER_ID}"
-_SCHEMA_SQL = (BACKEND_DIR / "migrations" / "001_fantm_schema.sql").read_text()
+_SCHEMA_SQL = "\n".join(p.read_text() for p in sorted((BACKEND_DIR / "migrations").glob("*.sql")))
 
 
 def _with_db_name(url: str, db_name: str) -> str:

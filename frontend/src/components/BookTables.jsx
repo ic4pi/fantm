@@ -42,6 +42,7 @@ export default function BookTables({ bookId }) {
       </div>
       <p className="font-mono text-xs text-muted-foreground mb-4">
         Canon the AI re-reads before every chapter — opponents, a schedule, results, a roster. It won't contradict a date, score or result logged here.
+        Give a table a Chapter column and each row stays hidden from the writer until that chapter.
         Changes reach the next chapter it writes.
       </p>
 

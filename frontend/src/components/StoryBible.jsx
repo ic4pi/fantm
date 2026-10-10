@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import ListInput from "@/components/ListInput";
+import RevealsInput from "@/components/RevealsInput";
 import { POV_OPTIONS } from "@/lib/storyBible";
 import { BookOpen, Plus, Trash2, Save } from "lucide-react";
 
@@ -18,6 +19,7 @@ export default function StoryBible({ bookId, book, onSaved }) {
   const [worldRules, setWorldRules] = useState(book.world_rules || []);
   const [text, setText] = useState(bibleText(book.bible));
   const [themes, setThemes] = useState(book.bible?.themes || []);
+  const [reveals, setReveals] = useState(book.bible?.reveals || []);
   const [charName, setCharName] = useState("");
   const [charRole, setCharRole] = useState("");
   const [charDesc, setCharDesc] = useState("");
@@ -38,6 +40,7 @@ export default function StoryBible({ bookId, book, onSaved }) {
     setWorldRules(book.world_rules || []);
     setText(bibleText(book.bible));
     setThemes(book.bible?.themes || []);
+    setReveals(book.bible?.reveals || []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book.premise, book.characters, book.plot_threads, book.world_rules, book.bible]);
 
@@ -88,7 +91,7 @@ export default function StoryBible({ bookId, book, onSaved }) {
 
   const handleSave = async () => {
     setSaving(true);
-    await api.patch(`/books/${bookId}/bible`, { premise, characters, plot_threads: plotThreads, world_rules: worldRules, themes, ...text });
+    await api.patch(`/books/${bookId}/bible`, { premise, characters, plot_threads: plotThreads, world_rules: worldRules, themes, reveals, ...text });
     setSaving(false);
     setDirty(false);
     setSaved(true);
@@ -169,6 +172,11 @@ export default function StoryBible({ bookId, book, onSaved }) {
           <label className="block text-muted-foreground mb-2">style notes</label>
           <textarea rows={2} value={text.style_notes} onChange={setField("style_notes")} maxLength={2000}
             className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none" data-testid="story-bible-style-notes-input" />
+        </div>
+
+        <div>
+          <label className="block text-muted-foreground mb-2">reveals <span className="opacity-60">(kept from the writer until their chapter)</span></label>
+          <RevealsInput reveals={reveals} onChange={(next) => { setReveals(next); markDirty(); }} testId="story-bible-reveal" />
         </div>
 
         <div>

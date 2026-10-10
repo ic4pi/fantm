@@ -155,15 +155,27 @@ def generate_outline(book: dict, reference_tables: list = None) -> dict:
     ) if tables_desc else ""
     fixed_title = (book.get("bible") or {}).get("title")
     title_block = f'\nThe author has titled this book "{fixed_title}" — use that exact title.\n' if fixed_title else ""
+    reveals = (book.get("bible") or {}).get("reveals") or []
+    reveals_block = ""
+    if reveals:
+        listed_reveals = "\n".join(f"- Chapter {r['chapter']}: {r['text']}" for r in reveals)
+        reveals_block = (
+            "\nPlanned reveals — each one must land in exactly the chapter given, and no earlier "
+            f"chapter's summary may state or imply it:\n{listed_reveals}\n"
+        )
     user = f"""Create a book outline for a {book['book_type']} with genre "{book['genre']}" and tone "{book['tone']}".
 User's prompt/premise: {book['prompt']}
-{title_block}{bible_block}{characters_block}{world_rules_block}{tables_block}
+{title_block}{bible_block}{characters_block}{world_rules_block}{tables_block}{reveals_block}
+The premise, character descriptions and plot threads are shown to the writer of EVERY chapter, including
+chapter 1 — so write them as things stand at the START of the book: no endings, outcomes, twists or
+secrets. Those belong only in the summary of the chapter where they happen.
+
 Return JSON with this exact shape:
 {{
   "title": "book title",
-  "premise": "2-3 sentence expanded premise",
-  "characters": [{{"name": "...", "role": "...", "description": "..."}}],
-  "plot_threads": ["thread 1", "thread 2"],
+  "premise": "2-3 sentence setup of the story as it begins — no ending, no twists",
+  "characters": [{{"name": "...", "role": "...", "description": "who they are at the start — no secrets, no fate"}}],
+  "plot_threads": ["an open question the story will explore — not its answer"],
   "chapters": [{{"title": "...", "summary": "1-2 sentence summary of what happens"}}]
 }}
 
@@ -189,10 +201,24 @@ def _style_prompt(book: dict) -> str:
 MAX_TABLES_PROMPT_CHARS = 12000
 
 
-def _render_reference_tables(tables: list) -> str:
+def _row_chapter(row: dict, chapter_col: str):
+    try:
+        return int(str(row.get(chapter_col, "")).strip())
+    except ValueError:
+        return None
+
+
+def _render_reference_tables(tables: list, chapter: int = None) -> str:
     """Freeform author tables (a sports schedule, a timeline, anything) as
     plain text the model can read and stay consistent with — e.g. not
     inventing a score that contradicts one the author already logged.
+
+    A table with a "Chapter" column is gated when rendering for a given
+    chapter: rows numbered after it are left out entirely, so the writer of
+    chapter 2 never sees the finals score; rows for this chapter are marked;
+    rows with no chapter number are plain reference and always shown. The
+    outline (chapter=None) sees every row — it has to plan the whole book.
+
     Capped so 20 full tables can't crowd the chapter itself out of the
     model's context."""
     if not tables:
@@ -203,24 +229,56 @@ def _render_reference_tables(tables: list) -> str:
         rows = t.get("rows") or []
         if not rows or not columns:
             continue
-        header = " | ".join(columns)
-        lines = [" | ".join(str(row.get(col, "")) for col in columns) for row in rows]
-        blocks.append(f"[{t.get('name', 'Table')}]\n{header}\n" + "\n".join(lines))
+        chapter_col = next((c for c in columns if c.strip().lower() == "chapter"), None)
+        lines = []
+        for row in rows:
+            row_ch = _row_chapter(row, chapter_col) if chapter_col else None
+            if chapter is not None and row_ch is not None and row_ch > chapter:
+                continue
+            line = " | ".join(str(row.get(col, "")) for col in columns)
+            if chapter is not None and row_ch == chapter:
+                line += "   <- happens in THIS chapter"
+            lines.append(line)
+        if lines:
+            blocks.append(f"[{t.get('name', 'Table')}]\n{' | '.join(columns)}\n" + "\n".join(lines))
     text = "\n\n".join(blocks)
     if len(text) > MAX_TABLES_PROMPT_CHARS:
         text = text[:MAX_TABLES_PROMPT_CHARS] + "\n[...tables truncated]"
     return text
 
 
+def _render_reveals(book: dict, chapter: int) -> str:
+    """Author-planned reveals as this chapter's writer may know them: earlier
+    ones as established fact, this chapter's as the job to do, later ones
+    marked "hint" as clues it may plant but never state — and later ones
+    without "hint" not at all, so there is nothing for it to leak."""
+    reveals = (book.get("bible") or {}).get("reveals") or []
+    past = [r["text"] for r in reveals if r["chapter"] < chapter]
+    now = [r["text"] for r in reveals if r["chapter"] == chapter]
+    hints = [r["text"] for r in reveals if r["chapter"] > chapter and r.get("hint")]
+    parts = []
+    if past:
+        parts.append("Already revealed earlier (characters now know this):\n" + "\n".join(f"- {t}" for t in past))
+    if now:
+        parts.append("REVEAL IN THIS CHAPTER — this is where it comes out:\n" + "\n".join(f"- {t}" for t in now))
+    if hints:
+        parts.append(
+            "Hidden truths — you may plant a subtle clue or misdirection, but never state, confirm, "
+            "or let any character discover them in this chapter:\n" + "\n".join(f"- {t}" for t in hints)
+        )
+    return "\n\n".join(parts)
+
+
 def generate_chapter_content(
-    book: dict, chapter_brief: dict, chapter_index: int, total: int,
-    remaining_briefs: list = None, reference_tables: list = None,
+    book: dict, chapter_brief: dict, chapter_index: int, total: int, reference_tables: list = None,
 ) -> str:
     characters_desc = "\n".join(f"- {c.get('name')} ({c.get('role', '')}): {c.get('description', '')}" for c in book.get("characters", []))
     threads_desc = "\n".join(f"- {t}" for t in book.get("plot_threads", []))
     world_rules_desc = "\n".join(f"- {r}" for r in book.get("world_rules", []))
-    tables_desc = _render_reference_tables(reference_tables or [])
+    chapter = chapter_index + 1
+    tables_desc = _render_reference_tables(reference_tables or [], chapter=chapter)
     bible_desc = _render_bible(book)
+    reveals_desc = _render_reveals(book, chapter)
     label = TYPE_LABELS.get(book["book_type"], "book")
     style_instruction = _style_prompt(book)
     system = (
@@ -228,12 +286,17 @@ def generate_chapter_content(
         f"Tone: {book['tone']}. Genre: {book['genre']}. "
         + (f"{style_instruction} " if style_instruction else "")
         + "Write vivid, coherent, well-paced prose that continues the story forward without repeating earlier events. "
+        "Write only what happens in this chapter: never narrate, summarize, predict or have a character know "
+        "anything that happens later in the book. "
         "Do not include the chapter title or number in the body, output only the prose content."
     )
-    upcoming = remaining_briefs or []
-    upcoming_desc = "\n".join(
-        f"- Ch {chapter_index + 2 + i}: \"{b.get('title')}\" — {b.get('summary')}" for i, b in enumerate(upcoming)
-    )
+    if chapter == total:
+        position = "This is the final chapter — bring the story to a satisfying close."
+    else:
+        position = (
+            f"This is chapter {chapter} of {total}. Leave the central conflict unresolved — "
+            "end this chapter with the story still moving forward."
+        )
     user = f"""Book premise: {book.get('premise', '')}
 
 Story bible (the author's fixed choices — follow them):
@@ -251,10 +314,9 @@ Special world rules / satire elements (override normal-world logic where they ap
 Reference tables the author is tracking (canon — never contradict a logged date, opponent, score, result or fact):
 {tables_desc or 'N/A'}
 
-Story so far (running summary): {book.get('running_summary') or 'This is the first chapter.'}
+{reveals_desc + chr(10) + chr(10) if reveals_desc else ''}Story so far (running summary): {book.get('running_summary') or 'This is the first chapter.'}
 
-Planned remaining chapters (for your awareness — write only THIS chapter, but keep these headed toward correctly):
-{upcoming_desc or 'This is the final chapter — bring the story to a satisfying close.'}
+{position}
 
 This chapter's brief — "{chapter_brief.get('title')}": {chapter_brief.get('summary')}
 
@@ -369,7 +431,7 @@ async def run_generation(book_id: str):
             reference_tables = [dict(t) for t in await pool.fetch("select name, columns, rows from book_tables where book_id=$1 order by created_at", book_id)]
 
             content = await asyncio.to_thread(
-                generate_chapter_content, book_doc, brief, idx, len(chapters_brief), chapters_brief[idx + 1:], reference_tables
+                generate_chapter_content, book_doc, brief, idx, len(chapters_brief), reference_tables
             )
             word_count = len(content.split())
             burn = round(word_count * multiplier)

@@ -3,10 +3,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+import importer
 import pricing
 from credits import ensure_monthly_stipend, get_balance, release_reservation, reserve_credits
 from db import get_pool
@@ -181,6 +182,23 @@ def _validate_style(user_tier: str, style: str, style_secondary_a: Optional[str]
         for s in (style_secondary_a, style_secondary_b):
             if s not in pricing.WRITER_STYLES:
                 raise HTTPException(400, f"Unknown base style for Chimera Blend: {s}")
+
+
+@router.post("/extract")
+async def extract_from_document(file: UploadFile = File(...), user=Depends(get_current_user)):
+    """Read an author's notes file and return create-form fields for them to
+    review and edit. Nothing is saved — the form only fills in."""
+    data = await file.read(importer.MAX_UPLOAD_BYTES + 1)
+    if len(data) > importer.MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "That file is over 5 MB.")
+    try:
+        text = importer.read_document(file.filename, data)
+    except importer.UnreadableDocument as e:
+        raise HTTPException(400, str(e))
+    try:
+        return await asyncio.to_thread(importer.extract_bible, text)
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
 
 
 @router.post("")

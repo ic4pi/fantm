@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { InsufficientCreditsModal } from "@/components/InsufficientCreditsModal";
 import ListInput from "@/components/ListInput";
+import RevealsInput from "@/components/RevealsInput";
 import { NewTableForm, TableGrid } from "@/components/TableGrid";
 import { MAX_TABLES, POV_OPTIONS } from "@/lib/storyBible";
 import { FileUp, Lock, Zap } from "lucide-react";
@@ -64,6 +65,7 @@ export default function CreateBook() {
   const [styleNotes, setStyleNotes] = useState(draft.styleNotes ?? "");
   const [influences, setInfluences] = useState(draft.influences ?? "");
   const [tables, setTables] = useState(draft.tables ?? []);
+  const [reveals, setReveals] = useState(draft.reveals ?? []);
   const [setting, setSetting] = useState(draft.setting ?? "");
   const [backstory, setBackstory] = useState(draft.backstory ?? "");
   const [chapterOutline, setChapterOutline] = useState(draft.chapterOutline ?? "");
@@ -115,7 +117,7 @@ export default function CreateBook() {
       localStorage.setItem(
         DRAFT_KEY,
         JSON.stringify({
-          bookType, title, prompt, subject, period, setting, backstory, themes, chapterOutline, timeline, worldRules, characters, tables,
+          bookType, title, prompt, subject, period, setting, backstory, themes, chapterOutline, timeline, worldRules, reveals, characters, tables,
           genre, tone, pov, styleNotes, influences, length, style, chimeraA, chimeraB,
         })
       );
@@ -123,7 +125,7 @@ export default function CreateBook() {
       // best-effort — private browsing / storage full shouldn't block writing
     }
   }, [
-    bookType, title, prompt, subject, period, setting, backstory, themes, chapterOutline, timeline, worldRules, characters, tables,
+    bookType, title, prompt, subject, period, setting, backstory, themes, chapterOutline, timeline, worldRules, reveals, characters, tables,
     genre, tone, pov, styleNotes, influences, length, style, chimeraA, chimeraB,
   ]);
 
@@ -231,7 +233,7 @@ export default function CreateBook() {
       const payload = {
         book_type: bookType, title, prompt, setting, backstory, themes,
         subject: isLife ? subject : "", period: isLife ? period : "",
-        chapter_outline: chapterOutline, timeline, world_rules: worldRules,
+        chapter_outline: chapterOutline, timeline, world_rules: worldRules, reveals,
         characters, genre, tone, pov, style_notes: styleNotes, influences, length, style,
         tables: tables.map(({ name, columns, rows }) => ({ name, columns, rows })),
       };
@@ -487,6 +489,13 @@ export default function CreateBook() {
         </div>
 
         <div>
+          <label className="block text-muted-foreground mb-2">
+            reveals <span className="opacity-60">(optional — twists and secrets, each kept from the writer until its chapter)</span>
+          </label>
+          <RevealsInput reveals={reveals} onChange={setReveals} testId="create-book-reveal" />
+        </div>
+
+        <div>
           <label className="block text-muted-foreground mb-2">characters <span className="opacity-60">(optional — up to {MAX_CHARACTERS})</span></label>
           {characters.length > 0 && (
             <div className="space-y-2 mb-3">
@@ -542,7 +551,7 @@ export default function CreateBook() {
 
         <div>
           <label className="block text-muted-foreground mb-2">
-            reference tables <span className="opacity-60">(optional — opponents, schedule, results, a roster... hard data the AI must not contradict)</span>
+            reference tables <span className="opacity-60">(optional — opponents, schedule, results, a roster... hard data the AI must not contradict. Give a table a Chapter column and each row stays hidden until that chapter.)</span>
           </label>
           <div className="space-y-4 mb-3">
             {tables.map((t, i) => (

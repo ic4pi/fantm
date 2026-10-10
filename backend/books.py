@@ -31,6 +31,12 @@ MAX_ROWS_PER_TABLE = 500
 POV_PATTERN = "^(|first_person|third_limited|third_omniscient|second_person)$"
 
 
+class RevealIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+    chapter: int = Field(ge=1, le=50)
+    hint: bool = False
+
+
 class TableSeedIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     columns: list[str] = Field(default_factory=list, max_length=20)
@@ -54,6 +60,7 @@ class CreateBookIn(BaseModel):
     chapter_outline: str = Field("", max_length=6000)
     timeline: str = Field("", max_length=6000)
     world_rules: list[str] = Field(default_factory=list, max_length=30)
+    reveals: list[RevealIn] = Field(default_factory=list, max_length=30)
     characters: list[CharacterSeedIn] = Field(default_factory=list, max_length=12)
     tables: list[TableSeedIn] = Field(default_factory=list, max_length=MAX_TABLES_PER_BOOK)
     length: str = Field(pattern="^(short|medium|long)$")
@@ -65,6 +72,8 @@ class CreateBookIn(BaseModel):
 # Story Bible fields kept in books.bible — editable after creation, and read
 # fresh before every chapter. Title is set once at creation and not listed.
 BIBLE_FIELDS = ("setting", "backstory", "themes", "pov", "style_notes", "influences", "subject", "period")
+# Reveals live in books.bible too, but are a list of objects, not text.
+BIBLE_LIST_FIELDS = ("reveals",)
 
 
 class UpdateChapterIn(BaseModel):
@@ -107,6 +116,7 @@ class UpdateBibleIn(BaseModel):
     influences: Optional[str] = Field(None, max_length=500)
     subject: Optional[str] = Field(None, max_length=200)
     period: Optional[str] = Field(None, max_length=200)
+    reveals: Optional[list[RevealIn]] = Field(None, max_length=30)
 
 
 def _iso(v):
@@ -234,6 +244,7 @@ async def create_book(body: CreateBookIn, user=Depends(get_current_user)):
         k: v.strip() if isinstance(v, str) else [t.strip() for t in v if t.strip()]
         for k, v in body.model_dump(include=set(BIBLE_FIELDS)).items()
     }
+    bible["reveals"] = [r.model_dump() for r in body.reveals]
     title = body.title.strip()
     if title:
         bible["title"] = title
@@ -312,7 +323,7 @@ async def update_bible(book_id: str, body: UpdateBibleIn, user=Depends(get_curre
     characters = [c.model_dump() for c in body.characters] if body.characters is not None else book.get("characters", [])
     plot_threads = body.plot_threads if body.plot_threads is not None else book.get("plot_threads", [])
     world_rules = body.world_rules if body.world_rules is not None else book.get("world_rules", [])
-    bible = (book.get("bible") or {}) | body.model_dump(include=set(BIBLE_FIELDS), exclude_none=True)
+    bible = (book.get("bible") or {}) | body.model_dump(include=set(BIBLE_FIELDS + BIBLE_LIST_FIELDS), exclude_none=True)
     row = await pool.fetchrow(
         "update books set premise=$2, characters=$3, plot_threads=$4, world_rules=$5, bible=$6, updated_at=$7 where id=$1 returning *",
         book["id"], premise, characters, plot_threads, world_rules, bible, datetime.now(timezone.utc),

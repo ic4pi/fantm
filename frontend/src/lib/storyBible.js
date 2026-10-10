@@ -7,18 +7,20 @@ export const POV_OPTIONS = [
 ];
 
 export const MAX_TABLES = 20;
+export const MAX_REVEALS = 30;
 export const MAX_TABLE_ROWS = 500;
 
 // One click starts a table with sensible columns; the author can add or
-// drop columns after. Sports presets first — a season is the case that
+// drop columns after. A "Chapter" column keeps each row hidden from the
+// writer until that chapter — so Results can't leak the finals score early. Sports presets first — a season is the case that
 // most needs hard data the AI must not contradict.
 export const TABLE_PRESETS = [
   { name: "Opponents", columns: ["Team", "City", "Coach", "Star Player", "Strengths", "Weaknesses", "History With Us"] },
   { name: "Schedule", columns: ["Game", "Date", "Opponent", "Home/Away", "Venue"] },
-  { name: "Results", columns: ["Game", "Opponent", "Score", "W/L", "Key Moment"] },
+  { name: "Results", columns: ["Chapter", "Game", "Opponent", "Score", "W/L", "Key Moment"] },
   { name: "Roster", columns: ["Name", "Position", "Number", "Notes"] },
   { name: "Locations", columns: ["Place", "Description", "Why It Matters"] },
-  { name: "Life Events", columns: ["Date", "Event", "Impact"] },
+  { name: "Life Events", columns: ["Chapter", "Date", "Event", "Impact"] },
 ];
 
 function splitCsvLine(line) {

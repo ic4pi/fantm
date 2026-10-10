@@ -6,7 +6,7 @@ import { InsufficientCreditsModal } from "@/components/InsufficientCreditsModal"
 import ListInput from "@/components/ListInput";
 import { NewTableForm, TableGrid } from "@/components/TableGrid";
 import { MAX_TABLES, POV_OPTIONS } from "@/lib/storyBible";
-import { Lock, Zap } from "lucide-react";
+import { FileUp, Lock, Zap } from "lucide-react";
 
 const BOOK_TYPES = [
   { value: "novel", label: "Novel" },
@@ -91,6 +91,8 @@ export default function CreateBook() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [insufficient, setInsufficient] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState(null);
 
   const MAX_CHARACTERS = 12;
 
@@ -124,6 +126,81 @@ export default function CreateBook() {
     bookType, title, prompt, subject, period, setting, backstory, themes, chapterOutline, timeline, worldRules, characters, tables,
     genre, tone, pov, styleNotes, influences, length, style, chimeraA, chimeraB,
   ]);
+
+  // Fill only what's still empty: an import never overwrites anything the
+  // author already typed. Lists append (deduped), tables are added.
+  const applyImport = (fileName, data) => {
+    const filled = [];
+    const kept = [];
+    const textFields = [
+      ["title", title, setTitle, "title"],
+      ["premise", prompt, setPrompt, "prompt"],
+      ["subject", subject, setSubject, "subject"],
+      ["time period", period, setPeriod, "period"],
+      ["setting", setting, setSetting, "setting"],
+      ["backstory", backstory, setBackstory, "backstory"],
+      ["chapter outline", chapterOutline, setChapterOutline, "chapter_outline"],
+      ["timeline", timeline, setTimeline, "timeline"],
+      ["genre", genre, setGenre, "genre"],
+      ["tone", tone, setTone, "tone"],
+      ["point of view", pov, setPov, "pov"],
+      ["style notes", styleNotes, setStyleNotes, "style_notes"],
+      ["influences", influences, setInfluences, "influences"],
+    ];
+    if (data.book_type && !prompt.trim()) setBookType(data.book_type);
+    for (const [label, current, set, key] of textFields) {
+      if (!data[key]) continue;
+      if (current.trim()) kept.push(label);
+      else {
+        set(data[key]);
+        filled.push(label);
+      }
+    }
+    const addStrings = (label, current, set, incoming, cap) => {
+      const have = new Set(current.map((x) => x.toLowerCase()));
+      const fresh = (incoming || []).filter((x) => !have.has(x.toLowerCase()));
+      const next = [...current, ...fresh].slice(0, cap);
+      if (next.length > current.length) {
+        set(next);
+        filled.push(`${label} (+${next.length - current.length})`);
+      }
+    };
+    addStrings("themes", themes, setThemes, data.themes, MAX_THEMES);
+    addStrings("world rules", worldRules, setWorldRules, data.world_rules, MAX_WORLD_RULES);
+    const names = new Set(characters.map((c) => c.name.toLowerCase()));
+    const newChars = (data.characters || []).filter((c) => !names.has(c.name.toLowerCase()));
+    const nextChars = [...characters, ...newChars].slice(0, MAX_CHARACTERS);
+    if (nextChars.length > characters.length) {
+      setCharacters(nextChars);
+      filled.push(`characters (+${nextChars.length - characters.length})`);
+    }
+    const room = MAX_TABLES - tables.length;
+    const newTables = (data.tables || []).slice(0, room);
+    if (newTables.length) {
+      setTables((ts) => [...ts, ...newTables.map((t, i) => ({ ...t, key: `${Date.now()}-import-${i}` }))]);
+      filled.push(`tables: ${newTables.map((t) => t.name).join(", ")}`);
+    }
+    setImportReport({ fileName, filled, kept, partial: data.chars_read < data.chars_total, read: data.chars_read, total: data.chars_total });
+  };
+
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    setError("");
+    setImportReport(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const { data } = await api.post("/books/extract", form);
+      applyImport(file.name, data);
+    } catch (err) {
+      setError(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const selectedStyle = styles?.find((s) => s.key === style);
   const multiplier = useMemo(() => {
@@ -184,6 +261,37 @@ export default function CreateBook() {
     <div className="max-w-2xl mx-auto px-6 py-12" data-testid="create-book-page">
       <p className="font-mono text-accent text-xs tracking-widest mb-2">// NEW MANUSCRIPT</p>
       <h1 className="font-serif text-4xl tracking-tight mb-8">Describe your book</h1>
+
+      <div className="border border-border p-4 mb-8 font-mono text-sm" data-testid="create-book-import">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-foreground/90">Already have notes?</p>
+            <p className="text-[11px] text-muted-foreground opacity-80">
+              Upload a .txt, .md, .docx or .pdf. The AI pulls out what's there and fills the form, only where it's still empty. Nothing generates until you've checked it.
+            </p>
+          </div>
+          <label className={`shrink-0 flex items-center gap-2 py-2 px-4 border border-primary/50 text-primary hover:border-primary transition-colors cursor-pointer ${importing ? "opacity-50 pointer-events-none" : ""}`}>
+            <FileUp className="w-4 h-4" /> {importing ? "reading your document..." : "import a document"}
+            <input type="file" accept=".txt,.md,.docx,.pdf" onChange={handleImport} className="hidden" disabled={importing} data-testid="create-book-import-input" />
+          </label>
+        </div>
+        {importReport && (
+          <div className="mt-3 pt-3 border-t border-border text-[11px] space-y-1" data-testid="create-book-import-report">
+            <p className="text-primary">Imported from {importReport.fileName}. Review every field below for accuracy before generating.</p>
+            <p className="text-muted-foreground">
+              {importReport.filled.length ? `Filled: ${importReport.filled.join(" · ")}` : "Nothing new found to fill."}
+            </p>
+            {importReport.kept.length > 0 && (
+              <p className="text-muted-foreground">Kept what you'd already typed for: {importReport.kept.join(", ")}</p>
+            )}
+            {importReport.partial && (
+              <p className="text-destructive">
+                Only the first {importReport.read.toLocaleString()} of {importReport.total.toLocaleString()} characters were read. Import the rest as a second file, or add it by hand.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-8 font-mono text-sm">
         <div>

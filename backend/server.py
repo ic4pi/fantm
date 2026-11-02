@@ -56,8 +56,13 @@ async def health():
 
 @app.on_event("startup")
 async def startup():
-    await db.connect()
-    await db.apply_migrations()
+    # Start even if the database is down (e.g. Supabase paused it): a deploy
+    # then still goes live, /api/health reports the database as unreachable,
+    # and the first request after the database returns connects normally.
+    try:
+        await db.connect()
+    except Exception:
+        logger.exception("Database unreachable at startup; serving anyway and retrying on the next request.")
 
     absent = config.missing_optional_env()
     if absent:

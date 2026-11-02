@@ -19,13 +19,13 @@ jobs:
       - name: Ping API health check
         run: |
           for attempt in 1 2 3 4; do
-            body=$(curl -sS --max-time 120 https://fantm-backend-5yfi.onrender.com/api/health || true)
+            body=$(curl -sS --max-time 90 https://fantm-backend-5yfi.onrender.com/api/health || true)
             echo "attempt $attempt: $body"
             if echo "$body" | grep -q '"database":"ok"'; then
               echo "Backend and database are awake."
               exit 0
             fi
-            sleep 30
+            sleep 20
           done
           echo "::error::Health check never reported the database as ok. If Supabase paused the project, restore it from the Supabase dashboard."
           exit 1

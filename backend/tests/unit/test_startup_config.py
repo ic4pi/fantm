@@ -96,3 +96,17 @@ def test_startup_migrations_restore_a_missing_column(client):
         return await pool.fetchval(
             "select count(*) from information_schema.columns where table_name='books' and column_name='bible'")
     assert client.portal.call(drop_then_migrate) == 1
+
+
+def test_the_api_starts_and_reports_degraded_when_the_database_is_down(client, monkeypatch):
+    import db
+    import server
+    live_pool = db.pool
+    monkeypatch.setattr(db, "DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:1/unreachable")
+    db.pool = None
+    try:
+        client.portal.call(server.startup)  # must not raise
+        assert client.get("/api/health").json() == {"status": "degraded", "database": "unreachable"}
+    finally:
+        db.pool = live_pool
+    assert client.get("/api/health").json() == {"status": "ok", "database": "ok"}

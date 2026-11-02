@@ -68,7 +68,7 @@ def test_create_stores_the_bible_and_title(client, db, user):
         "backstory": "The Ironmen have not made the playoffs in eleven years.",
         "themes": ["redemption", "second chances"], "pov": "first_person",
         "style_notes": "Short punchy sentences in game scenes.", "influences": "Friday Night Lights",
-        "subject": "", "period": "", "reveals": [],
+        "special_instructions": "", "subject": "", "period": "", "reveals": [],
     }
 
 
@@ -211,3 +211,22 @@ def test_create_and_patch_store_reveals(client, db, user):
 def test_a_reveal_needs_a_chapter(client, user):
     body = SPORTS_BOOK | {"reveals": [{"text": "x", "chapter": 0}]}
     assert client.post("/api/books", json=body, cookies=user["cookies"]).status_code == 422
+
+
+# ---------- special instructions ----------
+
+def test_special_instructions_are_stored_and_editable(client, db, user):
+    body = SPORTS_BOOK | {"special_instructions": "  Never kill the dog.  "}
+    book_id = client.post("/api/books", json=body, cookies=user["cookies"]).json()["id"]
+    assert db.call(_get_book, book_id)["bible"]["special_instructions"] == "Never kill the dog."
+    r = client.patch(f"/api/books/{book_id}/bible", json={"special_instructions": "Keep the dog alive."}, cookies=user["cookies"])
+    assert r.json()["bible"]["special_instructions"] == "Keep the dog alive."
+
+
+def test_special_instructions_reach_outline_and_every_chapter(monkeypatch):
+    sent = _capture_chat(monkeypatch, '{"chapters": []}')
+    book = {"book_type": "novel", "genre": "g", "tone": "t", "length": "short", "prompt": "p" * 20, "style": "house",
+            "bible": {"special_instructions": "Never kill the dog."}}
+    generation.generate_outline(book)
+    generation.generate_chapter_content(book, {"title": "T", "summary": "s"}, 3, 5)
+    assert all("special instructions — follow these throughout: Never kill the dog." in p for p in sent)

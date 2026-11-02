@@ -115,6 +115,8 @@ def _render_bible(book: dict) -> str:
         lines.append(f"Influences (draw on their voice, pacing and structure — never copy their text): {bible['influences']}")
     if bible.get("style_notes"):
         lines.append(f"Author's style notes: {bible['style_notes']}")
+    if bible.get("special_instructions"):
+        lines.append(f"Author's special instructions — follow these throughout: {bible['special_instructions']}")
     return "\n".join(lines)
 
 

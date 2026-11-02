@@ -104,6 +104,7 @@ EXTRACT_SHAPE = """{
   "pov": "first_person | third_limited | third_omniscient | second_person, or \\"\\"",
   "style_notes": "how the author wants it written",
   "influences": "books or authors named as influences",
+  "special_instructions": "any other instruction to the writer that fits no field above",
   "chapter_outline": "chapter-by-chapter plan, one line per chapter, if the notes have one",
   "timeline": "dated or ordered sequence of events, if the notes have one",
   "world_rules": ["special rule of how this world works"],
@@ -132,7 +133,8 @@ def merge_extractions(parts: list[dict]) -> dict:
     limits. Short fields take the first non-empty value; long text fields
     join every part's text; lists dedupe; tables with the same name merge."""
     out = {k: "" for k in ("book_type", "title", "prompt", "genre", "tone", "subject", "period", "pov")}
-    long_text = {"setting": [], "backstory": [], "style_notes": [], "influences": [], "chapter_outline": [], "timeline": []}
+    long_text = {"setting": [], "backstory": [], "style_notes": [], "influences": [], "special_instructions": [],
+                 "chapter_outline": [], "timeline": []}
     themes, rules, characters, tables = [], [], {}, {}
 
     for p in parts:
@@ -175,7 +177,7 @@ def merge_extractions(parts: list[dict]) -> dict:
     for k, n in limits.items():
         out[k] = out[k][:n]
     long_limits = {"setting": 2000, "backstory": 3000, "style_notes": 2000, "influences": 500,
-                   "chapter_outline": 6000, "timeline": 6000}
+                   "special_instructions": 4000, "chapter_outline": 6000, "timeline": 6000}
     for k, n in long_limits.items():
         out[k] = "\n\n".join(long_text[k])[:n]
     out["themes"] = themes[:15]

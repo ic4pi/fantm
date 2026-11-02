@@ -55,6 +55,7 @@ class CreateBookIn(BaseModel):
     pov: str = Field("", pattern=POV_PATTERN)
     style_notes: str = Field("", max_length=2000)
     influences: str = Field("", max_length=500)
+    special_instructions: str = Field("", max_length=4000)
     subject: str = Field("", max_length=200)
     period: str = Field("", max_length=200)
     chapter_outline: str = Field("", max_length=6000)
@@ -71,7 +72,9 @@ class CreateBookIn(BaseModel):
 
 # Story Bible fields kept in books.bible — editable after creation, and read
 # fresh before every chapter. Title is set once at creation and not listed.
-BIBLE_FIELDS = ("setting", "backstory", "themes", "pov", "style_notes", "influences", "subject", "period")
+BIBLE_FIELDS = (
+    "setting", "backstory", "themes", "pov", "style_notes", "influences", "special_instructions", "subject", "period",
+)
 # Reveals live in books.bible too, but are a list of objects, not text.
 BIBLE_LIST_FIELDS = ("reveals",)
 
@@ -114,6 +117,7 @@ class UpdateBibleIn(BaseModel):
     pov: Optional[str] = Field(None, pattern=POV_PATTERN)
     style_notes: Optional[str] = Field(None, max_length=2000)
     influences: Optional[str] = Field(None, max_length=500)
+    special_instructions: Optional[str] = Field(None, max_length=4000)
     subject: Optional[str] = Field(None, max_length=200)
     period: Optional[str] = Field(None, max_length=200)
     reveals: Optional[list[RevealIn]] = Field(None, max_length=30)

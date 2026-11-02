@@ -6,7 +6,7 @@ import { POV_OPTIONS } from "@/lib/storyBible";
 import { BookOpen, Plus, Trash2, Save } from "lucide-react";
 
 // Plain-text Story Bible fields (books.bible) — edited and saved as one group.
-const TEXT_FIELDS = ["setting", "backstory", "pov", "style_notes", "influences", "subject", "period"];
+const TEXT_FIELDS = ["setting", "backstory", "pov", "style_notes", "influences", "special_instructions", "subject", "period"];
 
 function bibleText(bible) {
   return Object.fromEntries(TEXT_FIELDS.map((k) => [k, bible?.[k] || ""]));
@@ -172,6 +172,12 @@ export default function StoryBible({ bookId, book, onSaved }) {
           <label className="block text-muted-foreground mb-2">style notes</label>
           <textarea rows={2} value={text.style_notes} onChange={setField("style_notes")} maxLength={2000}
             className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none" data-testid="story-bible-style-notes-input" />
+        </div>
+
+        <div>
+          <label className="block text-muted-foreground mb-2">special instructions <span className="opacity-60">(followed in every chapter — no twists here)</span></label>
+          <textarea rows={3} value={text.special_instructions} onChange={setField("special_instructions")} maxLength={4000}
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none" data-testid="story-bible-special-instructions-input" />
         </div>
 
         <div>

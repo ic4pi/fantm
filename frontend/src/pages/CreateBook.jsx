@@ -64,6 +64,7 @@ export default function CreateBook() {
   const [pov, setPov] = useState(draft.pov ?? "");
   const [styleNotes, setStyleNotes] = useState(draft.styleNotes ?? "");
   const [influences, setInfluences] = useState(draft.influences ?? "");
+  const [specialInstructions, setSpecialInstructions] = useState(draft.specialInstructions ?? "");
   const [tables, setTables] = useState(draft.tables ?? []);
   const [reveals, setReveals] = useState(draft.reveals ?? []);
   const [setting, setSetting] = useState(draft.setting ?? "");
@@ -118,7 +119,7 @@ export default function CreateBook() {
         DRAFT_KEY,
         JSON.stringify({
           bookType, title, prompt, subject, period, setting, backstory, themes, chapterOutline, timeline, worldRules, reveals, characters, tables,
-          genre, tone, pov, styleNotes, influences, length, style, chimeraA, chimeraB,
+          genre, tone, pov, styleNotes, influences, specialInstructions, length, style, chimeraA, chimeraB,
         })
       );
     } catch {
@@ -126,7 +127,7 @@ export default function CreateBook() {
     }
   }, [
     bookType, title, prompt, subject, period, setting, backstory, themes, chapterOutline, timeline, worldRules, reveals, characters, tables,
-    genre, tone, pov, styleNotes, influences, length, style, chimeraA, chimeraB,
+    genre, tone, pov, styleNotes, influences, specialInstructions, length, style, chimeraA, chimeraB,
   ]);
 
   // Fill only what's still empty: an import never overwrites anything the
@@ -148,6 +149,7 @@ export default function CreateBook() {
       ["point of view", pov, setPov, "pov"],
       ["style notes", styleNotes, setStyleNotes, "style_notes"],
       ["influences", influences, setInfluences, "influences"],
+      ["special instructions", specialInstructions, setSpecialInstructions, "special_instructions"],
     ];
     if (data.book_type && !prompt.trim()) setBookType(data.book_type);
     for (const [label, current, set, key] of textFields) {
@@ -234,7 +236,7 @@ export default function CreateBook() {
         book_type: bookType, title, prompt, setting, backstory, themes,
         subject: isLife ? subject : "", period: isLife ? period : "",
         chapter_outline: chapterOutline, timeline, world_rules: worldRules, reveals,
-        characters, genre, tone, pov, style_notes: styleNotes, influences, length, style,
+        characters, genre, tone, pov, style_notes: styleNotes, influences, special_instructions: specialInstructions, length, style,
         tables: tables.map(({ name, columns, rows }) => ({ name, columns, rows })),
       };
       if (style === "chimera") {
@@ -626,6 +628,25 @@ export default function CreateBook() {
             className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2"
             data-testid="create-book-influences-input"
           />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-muted-foreground">special instructions <span className="opacity-60">(optional — anything else, in case you forgot something)</span></label>
+            <span className="text-[10px] text-muted-foreground">{specialInstructions.length}/4000</span>
+          </div>
+          <textarea
+            rows={4}
+            maxLength={4000}
+            value={specialInstructions}
+            onChange={(e) => setSpecialInstructions(e.target.value)}
+            placeholder={"Never kill the dog. Keep chapters under 1,000 words. Every game ends in the third period, not overtime."}
+            className="w-full bg-transparent border border-border focus:border-primary outline-none px-3 py-2 resize-none"
+            data-testid="create-book-special-instructions-input"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1 opacity-70">
+            The AI follows these in every chapter. Don't put twists here — add them under Reveals so they stay hidden until their chapter.
+          </p>
         </div>
 
         <div>

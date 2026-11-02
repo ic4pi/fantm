@@ -135,3 +135,8 @@ def test_extract_refuses_unsupported_files(client, user):
 
 def test_extract_requires_login(client):
     assert client.post("/api/books/extract", files={"file": ("x.txt", b"hello there")}).status_code == 401
+
+
+def test_merge_keeps_special_instructions():
+    merged = importer.merge_extractions([{"special_instructions": "No epilogue."}, {"special_instructions": "Swearing is fine."}])
+    assert merged["special_instructions"] == "No epilogue.\n\nSwearing is fine."

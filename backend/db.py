@@ -23,9 +23,18 @@ async def _init_connection(conn: asyncpg.Connection):
 
 
 async def connect() -> asyncpg.Pool:
+    """Open the pool and bring the schema up to date. Raises if the database
+    is unreachable; the next get_pool() call simply tries again, so the app
+    recovers on its own once the database is back."""
     global pool
     if pool is None:
-        pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10, init=_init_connection)
+        new_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10, init=_init_connection)
+        if pool is None:
+            pool = new_pool
+            await apply_migrations()
+        else:
+            # Two first requests raced to connect; keep the one that won.
+            await new_pool.close()
     return pool
 
 

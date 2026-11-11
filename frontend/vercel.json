@@ -3,7 +3,7 @@
   "buildCommand": "yarn build",
   "outputDirectory": "build",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://fantm-backend-5yfi.onrender.com/api/:path*" },
+    { "source": "/api/:path*", "destination": "https://jeremy-f-wall--fantm-web.modal.run/api/:path*" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

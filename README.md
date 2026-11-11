@@ -32,7 +32,7 @@ modal secret create fantm-env \
 modal deploy backend/modal_app.py
 ```
 
-It prints `https://jeremy-f-wall--fantm-web.modal.run`.
+It prints `https://jeremy-f-wall--fantm-web.us-east.modal.run`.
 
 Vercel (frontend, root directory `frontend`) reaches the API through the
 `/api` rewrite in `frontend/vercel.json`, so auth cookies stay first-party.

@@ -11,7 +11,7 @@ the container warm for the length of a run; scaledown_window covers a pause.
 
     modal deploy backend/modal_app.py
 
-URL will be https://jeremy-f-wall--fantm-web.modal.run
+URL will be https://jeremy-f-wall--fantm-web.us-east.modal.run
 Set that as REACT_APP_BACKEND_URL on the Vercel frontend, then redeploy.
 Stripe keys are optional — without them, books still generate; Store checkout
 stays off.

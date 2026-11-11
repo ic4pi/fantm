@@ -11,7 +11,6 @@ import os
 REQUIRED_ENV = {
     "DATABASE_URL": "Postgres connection string (Supabase: Project Settings -> Database -> Connection string).",
     "JWT_SECRET": "Secret used to sign access and refresh tokens.",
-    "GROQ_API_KEY": "Groq key for the House model (outlines, continuity, free-tier prose).",
     "CORS_ORIGINS": "Comma-separated list of allowed browser origins.",
 }
 
@@ -24,6 +23,8 @@ STRIPE_ENV = ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET")
 # these stay advisory rather than fatal.
 OPTIONAL_ENV = ("OPENROUTER_API_KEY", "VENICE_API_KEY", "ANTHROPIC_API_KEY")
 
+HOUSE_MODEL_ENV = ("GROQ_API_KEY", "OPENROUTER_API_KEY")
+
 INSECURE_JWT_SECRETS = {"secret", "changeme", "change-me", "dev", "development", "test", "jwt_secret"}
 
 
@@ -34,6 +35,14 @@ def validate_required_env():
         details = "\n".join(f"  - {name}: {REQUIRED_ENV[name]}" for name in sorted(missing))
         raise RuntimeError(
             f"Refusing to start — {len(missing)} required environment variable(s) are unset:\n{details}"
+        )
+
+    # The House model (outlines, continuity, free-tier prose) runs on Groq when
+    # its key is set, otherwise on OpenRouter. One of the two must exist.
+    if not any((os.environ.get(n) or "").strip() for n in HOUSE_MODEL_ENV):
+        raise RuntimeError(
+            "Refusing to start — set GROQ_API_KEY or OPENROUTER_API_KEY. "
+            "The House model (outlines, continuity, free-tier prose) needs one of them."
         )
 
     secret = os.environ["JWT_SECRET"].strip()

@@ -15,8 +15,11 @@ from db import get_pool
 
 logger = logging.getLogger(__name__)
 
-client = Groq(api_key=os.environ["GROQ_API_KEY"])
+_GROQ_KEY = (os.environ.get("GROQ_API_KEY") or "").strip()
+# Groq is optional now: without its key the House model runs on OpenRouter.
+client = Groq(api_key=_GROQ_KEY) if _GROQ_KEY else None
 MODEL = "llama-3.3-70b-versatile"
+HOUSE_OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct"
 
 LENGTH_CHAPTERS = {"short": 5, "medium": 8, "long": 12}
 TYPE_LABELS = {"novel": "novel", "memoir": "memoir", "biography": "biography"}
@@ -25,7 +28,12 @@ TYPE_LABELS = {"novel": "novel", "memoir": "memoir", "biography": "biography"}
 def _chat(messages, max_tokens=2000, temperature=0.85):
     """House-model chat — always Groq, regardless of the book's chosen
     style. Used for outline generation and continuity-state tracking,
-    which are internal bookkeeping calls, not the voice being paid for."""
+    which are internal bookkeeping calls, not the voice being paid for.
+    Runs on OpenRouter when no GROQ_API_KEY is set."""
+    if client is None:
+        return chat_providers.chat_complete(
+            "openrouter", HOUSE_OPENROUTER_MODEL, messages, max_tokens=max_tokens, temperature=temperature
+        )
     for attempt in range(3):
         try:
             completion = client.chat.completions.create(

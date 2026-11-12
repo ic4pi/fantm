@@ -48,9 +48,11 @@ async def health():
     try:
         pool = await db.get_pool()
         await pool.fetchval("select 1")
-    except Exception:
+    except Exception as e:
         logger.exception("Health check failed: database unreachable")
-        return {"status": "degraded", "database": "unreachable"}
+        # Exception class only (e.g. InvalidPasswordError, gaierror) — enough to
+        # tell a bad password from a bad host without leaking connection details.
+        return {"status": "degraded", "database": "unreachable", "error": type(e).__name__}
     return {"status": "ok", "database": "ok"}
 
 

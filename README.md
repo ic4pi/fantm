@@ -32,14 +32,15 @@ modal secret create fantm-env \
 modal deploy backend/modal_app.py
 ```
 
-It prints `https://ic4pi--fantm-web.modal.run`.
+It prints `https://jeremy-f-wall--fantm-web.us-east.modal.run`.
 
-Vercel (frontend, root directory `frontend`):
-
-- `REACT_APP_BACKEND_URL` = that Modal URL
-- Redeploy
+Vercel (frontend, root directory `frontend`) reaches the API through the
+`/api` rewrite in `frontend/vercel.json`, so auth cookies stay first-party.
+Point that rewrite at the Modal URL and leave `REACT_APP_BACKEND_URL` empty.
 
 Stripe keys are optional. Skip them until you want the Store.
 
-Apply `backend/migrations/001_fantm_schema.sql` on the Supabase `fantm`
-project if the tables are not there yet.
+The API applies `backend/migrations/*.sql` itself on startup, so a new
+database needs no manual setup. A daily GitHub Action
+(`.github/workflows/keep-awake.yml`) pings `/api/health` so the free-tier
+Supabase database never pauses.

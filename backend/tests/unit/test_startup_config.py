@@ -120,7 +120,9 @@ def test_the_api_starts_and_reports_degraded_when_the_database_is_down(client, m
     db.pool = None
     try:
         client.portal.call(server.startup)  # must not raise
-        assert client.get("/api/health").json() == {"status": "degraded", "database": "unreachable"}
+        body = client.get("/api/health").json()
+        assert body["status"] == "degraded" and body["database"] == "unreachable"
+        assert body["error"]  # names the exception class, nothing more
     finally:
         db.pool = live_pool
     assert client.get("/api/health").json() == {"status": "ok", "database": "ok"}

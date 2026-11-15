@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -16,7 +17,7 @@ export default function Login() {
     setError("");
     const res = await login(email, password);
     setLoading(false);
-    if (res.ok) navigate("/dashboard");
+    if (res.ok) navigate(location.state?.from || "/dashboard");
     else setError(res.error);
   };
 
@@ -62,7 +63,7 @@ export default function Login() {
           <Link to="/forgot-password" className="text-primary" data-testid="login-forgot-password-link">Forgot password?</Link>
         </p>
         <p className="font-mono text-xs text-muted-foreground mt-2">
-          No account? <Link to="/register" className="text-primary" data-testid="login-register-link">Sign up</Link>
+          No account? <Link to="/register" state={location.state} className="text-primary" data-testid="login-register-link">Sign up</Link>
         </p>
       </div>
     </div>

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,7 +18,7 @@ export default function Register() {
     setError("");
     const res = await register(name, email, password);
     setLoading(false);
-    if (res.ok) navigate("/dashboard");
+    if (res.ok) navigate(location.state?.from || "/dashboard");
     else setError(res.error);
   };
 
@@ -71,7 +72,7 @@ export default function Register() {
           </button>
         </form>
         <p className="font-mono text-xs text-muted-foreground mt-6">
-          Already have an account? <Link to="/login" className="text-primary" data-testid="register-login-link">Sign in</Link>
+          Already have an account? <Link to="/login" state={location.state} className="text-primary" data-testid="register-login-link">Sign in</Link>
         </p>
       </div>
     </div>

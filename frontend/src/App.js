@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Navbar } from "@/components/Navbar";
+import { MobileNav } from "@/components/MobileNav";
 import { CustomCursor } from "@/components/CustomCursor";
 import { PageTransition } from "@/components/PageTransition";
 import Landing from "@/pages/Landing";
@@ -91,11 +92,12 @@ function App() {
               <Route path="/payment/cancel" element={<PaymentCancel />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/store" element={<ProtectedRoute><Store /></ProtectedRoute>} />
-              <Route path="/books/new" element={<ProtectedRoute><CreateBook /></ProtectedRoute>} />
+              <Route path="/books/new" element={<CreateBook />} />
               <Route path="/books/:id/generating" element={<ProtectedRoute><BookGeneration /></ProtectedRoute>} />
               <Route path="/books/:id/read" element={<ProtectedRoute><BookReader /></ProtectedRoute>} />
             </Routes>
           </PageTransition>
+          <MobileNav />
         </AuthProvider>
       </BrowserRouter>
     </div>

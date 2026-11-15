@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { InsufficientCreditsModal } from "@/components/InsufficientCreditsModal";
@@ -24,6 +25,10 @@ const LENGTHS = [
 const WORDS_PER_CHAPTER = 900;
 
 const MAX_THEMES = 15;
+
+// Guests only see the free House voice; the rest unlock after sign-up.
+const GUEST_STYLES = [{ key: "house", name: "House", multiplier: 1.0, unlocked: true }];
+const SIGNUP_STIPEND_NC = 5000;
 
 function SectionHeading({ children, note }) {
   return (
@@ -52,8 +57,13 @@ export default function CreateBook() {
   const navigate = useNavigate();
   const draft = useMemo(loadDraft, []);
 
-  const { data: styles } = useQuery({ queryKey: ["credits-styles"], queryFn: async () => (await api.get("/credits/styles")).data });
-  const { data: balanceData } = useQuery({ queryKey: ["credits-balance"], queryFn: async () => (await api.get("/credits/balance")).data });
+  const { user } = useAuth();
+  // A visitor can fill in the whole form; only Generate needs an account.
+  const isGuest = user === false;
+
+  const { data: fetchedStyles } = useQuery({ queryKey: ["credits-styles"], queryFn: async () => (await api.get("/credits/styles")).data, enabled: !!user });
+  const { data: balanceData } = useQuery({ queryKey: ["credits-balance"], queryFn: async () => (await api.get("/credits/balance")).data, enabled: !!user });
+  const styles = isGuest ? GUEST_STYLES : fetchedStyles;
 
   const [bookType, setBookType] = useState(draft.bookType ?? "novel");
   const [title, setTitle] = useState(draft.title ?? "");
@@ -220,10 +230,15 @@ export default function CreateBook() {
   const chapters = LENGTHS.find((l) => l.value === length)?.chapters || 5;
   const estimatedCost = useMemo(() => Math.ceil(chapters * WORDS_PER_CHAPTER * multiplier), [chapters, multiplier]);
   const balance = balanceData?.balance ?? 0;
-  const canAfford = balance >= estimatedCost;
+  const canAfford = isGuest || balance >= estimatedCost;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isGuest) {
+      // The draft is already saved to localStorage; sign-up returns here.
+      navigate("/register", { state: { from: "/books/new" } });
+      return;
+    }
     if (!canAfford) {
       setInsufficient({ required: estimatedCost, available: balance });
       return;
@@ -274,10 +289,16 @@ export default function CreateBook() {
               Upload a .txt, .md, .docx or .pdf. The AI pulls out what's there and fills the form, only where it's still empty. Nothing generates until you've checked it.
             </p>
           </div>
-          <label className={`shrink-0 flex items-center gap-2 py-2 px-4 border border-primary/50 text-primary hover:border-primary transition-colors cursor-pointer ${importing ? "opacity-50 pointer-events-none" : ""}`}>
-            <FileUp className="w-4 h-4" /> {importing ? "reading your document..." : "import a document"}
-            <input type="file" accept=".txt,.md,.docx,.pdf" onChange={handleImport} className="hidden" disabled={importing} data-testid="create-book-import-input" />
-          </label>
+          {isGuest ? (
+            <Link to="/register" state={{ from: "/books/new" }} className="shrink-0 flex items-center gap-2 py-2 px-4 border border-primary/50 text-primary hover:border-primary transition-colors" data-testid="create-book-import-signup">
+              <FileUp className="w-4 h-4" /> sign up to import
+            </Link>
+          ) : (
+            <label className={`shrink-0 flex items-center gap-2 py-2 px-4 border border-primary/50 text-primary hover:border-primary transition-colors cursor-pointer ${importing ? "opacity-50 pointer-events-none" : ""}`}>
+              <FileUp className="w-4 h-4" /> {importing ? "reading your document..." : "import a document"}
+              <input type="file" accept=".txt,.md,.docx,.pdf" onChange={handleImport} className="hidden" disabled={importing} data-testid="create-book-import-input" />
+            </label>
+          )}
         </div>
         {importReport && (
           <div className="mt-3 pt-3 border-t border-border text-[11px] space-y-1" data-testid="create-book-import-report">
@@ -712,18 +733,22 @@ export default function CreateBook() {
 
         <div className="gilt-corners border border-border p-4 flex items-center justify-between" data-testid="create-book-cost-estimate">
           <span className="flex items-center gap-2 text-muted-foreground"><Zap className="w-4 h-4 text-primary" /> estimated cost</span>
-          <span className={canAfford ? "text-primary" : "text-destructive"}>{estimatedCost.toLocaleString()} NC (balance: {balance.toLocaleString()} NC)</span>
+          <span className={canAfford ? "text-primary" : "text-destructive"}>
+            {isGuest
+              ? `${estimatedCost.toLocaleString()} NC — a new account starts with ${SIGNUP_STIPEND_NC.toLocaleString()} NC`
+              : `${estimatedCost.toLocaleString()} NC (balance: ${balance.toLocaleString()} NC)`}
+          </span>
         </div>
 
         {error && <p className="text-destructive" data-testid="create-book-error">{error}</p>}
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || user === null}
           className="w-full py-4 bg-primary text-primary-foreground uppercase tracking-wide hover:shadow-[0_0_18px_rgba(111,242,212,0.35)] transition-shadow disabled:opacity-50"
           data-testid="create-book-submit-button"
         >
-          {loading ? "spinning up the engine..." : "generate book"}
+          {loading ? "spinning up the engine..." : isGuest ? "sign up to generate →" : "generate book"}
         </button>
       </form>
 

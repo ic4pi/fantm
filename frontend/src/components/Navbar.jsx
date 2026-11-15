@@ -22,16 +22,16 @@ export function Navbar() {
         <div className="flex items-center gap-4 font-mono text-sm">
           {user ? (
             <>
-              <Link to="/dashboard" className="flex items-center gap-1.5 text-foreground/80 hover:text-primary transition-colors" data-testid="navbar-dashboard-link">
+              <Link to="/dashboard" className="hidden md:flex items-center gap-1.5 text-foreground/80 hover:text-primary transition-colors" data-testid="navbar-dashboard-link">
                 <BookOpen className="w-4 h-4" /> library
               </Link>
-              <span className="px-2 py-1 border border-accent/40 text-accent text-xs uppercase tracking-wider" data-testid="navbar-tier-badge">
+              <span className="hidden md:inline px-2 py-1 border border-accent/40 text-accent text-xs uppercase tracking-wider" data-testid="navbar-tier-badge">
                 {user.tier_name || "Apprentice"}
               </span>
               <CreditBadge />
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 text-foreground/80 hover:text-secondary transition-colors"
+                className="hidden md:flex items-center gap-1.5 text-foreground/80 hover:text-secondary transition-colors"
                 data-testid="navbar-logout-button"
               >
                 <LogOut className="w-4 h-4" /> exit

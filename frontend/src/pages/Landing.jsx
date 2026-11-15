@@ -1,10 +1,9 @@
 import { Link } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
 import { BookOpen, Feather, Skull, Sparkles, FileDown, PenLine } from "lucide-react";
 
 export default function Landing() {
-  const { user } = useAuth();
-  const ctaTarget = user ? "/dashboard" : "/register";
+  // Everyone lands on the form; a visitor signs up only when they press Generate.
+  const ctaTarget = "/books/new";
 
   return (
     <div className="bg-background text-foreground" data-testid="landing-page">
@@ -17,7 +16,7 @@ export default function Landing() {
           </h1>
           <p className="font-serif text-lg md:text-xl text-muted-foreground max-w-xl mb-10 leading-relaxed">
             Give it a premise. It builds the outline, holds the cast and the open threads in mind,
-            and writes each chapter knowing everything that came before — and everything still to come.
+            and writes each chapter knowing everything that came before, and nothing that hasn't happened yet.
           </p>
           <div className="flex flex-wrap gap-4">
             <Link

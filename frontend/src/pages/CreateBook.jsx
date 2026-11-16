@@ -105,6 +105,8 @@ export default function CreateBook() {
   const [loading, setLoading] = useState(false);
   const [insufficient, setInsufficient] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [importName, setImportName] = useState("");
+  const [importError, setImportError] = useState("");
   const [importReport, setImportReport] = useState(null);
 
   const MAX_CHARACTERS = 12;
@@ -202,15 +204,19 @@ export default function CreateBook() {
     e.target.value = "";
     if (!file) return;
     setImporting(true);
+    setImportName(file.name);
+    setImportError("");
     setError("");
     setImportReport(null);
     try {
       const form = new FormData();
       form.append("file", file);
-      const { data } = await api.post("/books/extract", form);
+      const { data } = await api.post("/books/extract", form, { timeout: 180000 });
       applyImport(file.name, data);
     } catch (err) {
-      setError(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+      const status = err.response?.status ? ` (${err.response.status})` : "";
+      const msg = err.response?.data?.detail ? formatApiErrorDetail(err.response.data.detail) : err.message;
+      setImportError(`Import failed${status}: ${msg}`);
     } finally {
       setImporting(false);
     }
@@ -295,11 +301,14 @@ export default function CreateBook() {
             </Link>
           ) : (
             <label className={`shrink-0 flex items-center gap-2 py-2 px-4 border border-primary/50 text-primary hover:border-primary transition-colors cursor-pointer ${importing ? "opacity-50 pointer-events-none" : ""}`}>
-              <FileUp className="w-4 h-4" /> {importing ? "reading your document..." : "import a document"}
+              <FileUp className="w-4 h-4" /> {importing ? `reading ${importName || "your document"}...` : "import a document"}
               <input type="file" accept=".txt,.md,.docx,.pdf" onChange={handleImport} className="hidden" disabled={importing} data-testid="create-book-import-input" />
             </label>
           )}
         </div>
+        {importError && (
+          <p className="mt-3 pt-3 border-t border-border text-[12px] text-destructive" data-testid="create-book-import-error">{importError}</p>
+        )}
         {importReport && (
           <div className="mt-3 pt-3 border-t border-border text-[11px] space-y-1" data-testid="create-book-import-report">
             <p className="text-primary">Imported from {importReport.fileName}. Review every field below for accuracy before generating.</p>

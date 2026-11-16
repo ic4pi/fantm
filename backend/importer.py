@@ -197,13 +197,16 @@ def extract_bible(text: str) -> dict:
     chunks = [text[i:i + CHUNK_CHARS] for i in range(0, len(text), CHUNK_CHARS)]
     read = chunks[:MAX_CHUNKS]
     parts = []
+    last_error = None
     for n, chunk in enumerate(read, start=1):
         try:
             parts.append(_extract_chunk(chunk, n, len(read)))
-        except Exception:
+        except Exception as e:
+            last_error = e
             logger.exception("Extraction failed on part %s of %s", n, len(read))
     if not parts:
-        raise RuntimeError("Couldn't extract anything from that document. Please try again.")
+        why = f" ({type(last_error).__name__}: {str(last_error)[:200]})" if last_error else ""
+        raise RuntimeError(f"Couldn't extract anything from that document{why}. Please try again.")
     result = merge_extractions(parts)
     result["chars_read"] = sum(len(c) for c in read)
     result["chars_total"] = len(text)

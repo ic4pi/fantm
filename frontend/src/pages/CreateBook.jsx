@@ -106,6 +106,7 @@ export default function CreateBook() {
   const [insufficient, setInsufficient] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importName, setImportName] = useState("");
+  const [importError, setImportError] = useState("");
   const [importReport, setImportReport] = useState(null);
 
   const MAX_CHARACTERS = 12;
@@ -204,6 +205,7 @@ export default function CreateBook() {
     if (!file) return;
     setImporting(true);
     setImportName(file.name);
+    setImportError("");
     setError("");
     setImportReport(null);
     try {
@@ -212,7 +214,9 @@ export default function CreateBook() {
       const { data } = await api.post("/books/extract", form, { timeout: 180000 });
       applyImport(file.name, data);
     } catch (err) {
-      setError(formatApiErrorDetail(err.response?.data?.detail) || err.message);
+      const status = err.response?.status ? ` (${err.response.status})` : "";
+      const msg = err.response?.data?.detail ? formatApiErrorDetail(err.response.data.detail) : err.message;
+      setImportError(`Import failed${status}: ${msg}`);
     } finally {
       setImporting(false);
     }
@@ -302,6 +306,9 @@ export default function CreateBook() {
             </label>
           )}
         </div>
+        {importError && (
+          <p className="mt-3 pt-3 border-t border-border text-[12px] text-destructive" data-testid="create-book-import-error">{importError}</p>
+        )}
         {importReport && (
           <div className="mt-3 pt-3 border-t border-border text-[11px] space-y-1" data-testid="create-book-import-report">
             <p className="text-primary">Imported from {importReport.fileName}. Review every field below for accuracy before generating.</p>

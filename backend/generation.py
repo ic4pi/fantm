@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 _GROQ_KEY = (os.environ.get("GROQ_API_KEY") or "").strip()
 # Groq is optional now: without its key the House model runs on OpenRouter.
 client = Groq(api_key=_GROQ_KEY) if _GROQ_KEY else None
-MODEL = "llama-3.3-70b-versatile"
+MODEL = (os.environ.get("GROQ_MODEL") or "llama-3.3-70b-versatile").strip()
 HOUSE_OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct"
 
 LENGTH_CHAPTERS = {"short": 5, "medium": 8, "long": 12}
@@ -34,6 +34,7 @@ def _chat(messages, max_tokens=2000, temperature=0.85):
         return chat_providers.chat_complete(
             "openrouter", HOUSE_OPENROUTER_MODEL, messages, max_tokens=max_tokens, temperature=temperature
         )
+    have_openrouter = bool((os.environ.get("OPENROUTER_API_KEY") or "").strip())
     for attempt in range(3):
         try:
             completion = client.chat.completions.create(
@@ -41,6 +42,13 @@ def _chat(messages, max_tokens=2000, temperature=0.85):
             )
             return completion.choices[0].message.content
         except Exception as e:
+            # A retired/unavailable model never recovers on retry — go straight
+            # to OpenRouter instead of failing the whole run.
+            if have_openrouter and (type(e).__name__ == "NotFoundError" or attempt == 2):
+                logger.warning("Groq failed (%s: %s) — falling back to OpenRouter.", type(e).__name__, e)
+                return chat_providers.chat_complete(
+                    "openrouter", HOUSE_OPENROUTER_MODEL, messages, max_tokens=max_tokens, temperature=temperature
+                )
             if attempt == 2:
                 raise
             logger.warning("Groq call failed (attempt %s): %s", attempt + 1, e)

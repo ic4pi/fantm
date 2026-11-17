@@ -193,7 +193,61 @@ def merge_extractions(parts: list[dict]) -> dict:
     return out
 
 
+_LABELS = {
+    "BOOK TYPE": "book_type", "TITLE": "title", "GENRE": "genre", "TONE": "tone",
+    "POINT OF VIEW": "pov", "POV": "pov", "PREMISE": "prompt", "SETTING": "setting",
+    "BACKSTORY": "backstory", "THEMES": "themes", "CHARACTERS": "characters",
+    "STYLE NOTES": "style_notes", "INFLUENCES": "influences",
+    "SPECIAL INSTRUCTIONS": "special_instructions", "CHAPTER OUTLINE": "chapter_outline",
+    "TIMELINE": "timeline", "WORLD RULES": "world_rules", "SUBJECT": "subject", "PERIOD": "period",
+}
+_LABEL_RE = re.compile(r"^([A-Z][A-Z ]{1,25}):[ \t]*(.*)$")
+
+
+def parse_labelled(text: str) -> dict | None:
+    """Fast path for notes written as `LABEL: value` sections (the form's own
+    field names). Read exactly as written — no model, nothing invented.
+    Returns None unless at least three known labels are present."""
+    sections, cur = {}, None
+    for line in text.splitlines():
+        m = _LABEL_RE.match(line.strip())
+        if m and m.group(1) in _LABELS:
+            cur = _LABELS[m.group(1)]
+            sections[cur] = [m.group(2)] if m.group(2) else []
+        elif cur is not None:
+            sections[cur].append(line)
+    if len(sections) < 3:
+        return None
+
+    def block(k):
+        return "\n".join(sections.get(k, [])).strip()
+
+    pov_raw = block("pov").lower()
+    pov = ("first_person" if "first" in pov_raw else "second_person" if "second" in pov_raw
+           else "third_omniscient" if "omniscient" in pov_raw else "third_limited" if "third" in pov_raw else "")
+    chars = []
+    for ln in block("characters").splitlines():
+        parts = [p.strip() for p in ln.split("|")]
+        if parts and parts[0]:
+            chars.append({"name": parts[0], "role": parts[1] if len(parts) > 1 else "",
+                          "description": parts[2] if len(parts) > 2 else ""})
+    part = {k: block(k) for k in ("book_type", "title", "genre", "tone", "prompt", "setting", "backstory",
+                                  "style_notes", "influences", "special_instructions", "chapter_outline",
+                                  "timeline", "subject", "period")}
+    part["book_type"] = part["book_type"].lower()
+    part["pov"] = pov
+    part["themes"] = [t.strip() for t in re.split(r"[,\n]", block("themes")) if t.strip()]
+    part["world_rules"] = [r.strip() for r in block("world_rules").splitlines() if r.strip()]
+    part["characters"] = chars
+    return part
+
+
 def extract_bible(text: str) -> dict:
+    direct = parse_labelled(text)
+    if direct is not None:
+        result = merge_extractions([direct])
+        result["chars_read"] = result["chars_total"] = len(text)
+        return result
     chunks = [text[i:i + CHUNK_CHARS] for i in range(0, len(text), CHUNK_CHARS)]
     read = chunks[:MAX_CHUNKS]
     parts = []
